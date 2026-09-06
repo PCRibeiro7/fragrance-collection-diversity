@@ -62,6 +62,17 @@ export function aggregateEdges(
     .sort((a, b) => a.id.localeCompare(b.id))
 }
 
+export function edgeDirections(edge: AggregatedEdge) {
+  return {
+    forward: edge.evidence.some(
+      (item) => item.fromFragranceId === edge.sourceId && item.toFragranceId === edge.targetId,
+    ),
+    reverse: edge.evidence.some(
+      (item) => item.fromFragranceId === edge.targetId && item.toFragranceId === edge.sourceId,
+    ),
+  }
+}
+
 function detectCommunities(fragrances: Fragrance[], edges: AggregatedEdge[]): Map<string, number> {
   if (!fragrances.length) return new Map()
   const graph = new UndirectedGraph()

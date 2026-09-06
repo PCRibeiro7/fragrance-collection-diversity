@@ -235,7 +235,7 @@ function App() {
         </div>
 
         <div className="graph-meta">
-          <div className="legend"><span className="legend-owned" /> Owned <span className="legend-context" /> Context</div>
+          <div className="legend"><span className="legend-owned" /> Owned <span className="legend-context" /> Context <span aria-hidden="true">&rarr;</span> References <span aria-hidden="true">&harr;</span> Mutual</div>
           <div className="group-dots">
             {graphModel.clusters.slice(0, 10).map((cluster) => <span key={cluster} style={{ background: CLUSTER_COLORS[cluster % CLUSTER_COLORS.length] }} title={`Similarity group ${cluster + 1}`} />)}
           </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggregateEdges, buildGraphModel, findSharedNeighbors, visibleGraphElements } from './graph'
+import { aggregateEdges, edgeDirections, buildGraphModel, findSharedNeighbors, visibleGraphElements } from './graph'
 import type { Fragrance, SimilarityObservation } from './types'
 
 const now = '2026-01-01T00:00:00.000Z'
@@ -93,6 +93,29 @@ describe('graph derivation', () => {
       { fragranceId: 'Eros Energy', sharedIds: ['Cedrat Boise'] },
     ])
     expect(findSharedNeighbors('Outlands', fragrances, edges)).toEqual([])
+  })
+
+  it('derives arrow directions from evidence rather than sorted endpoints or weight', () => {
+    const forward = aggregateEdges([
+      observation('1', 'a', 'b', 'fragrantica'),
+      observation('2', 'a', 'b', 'parfumo'),
+    ])[0]
+    expect(forward.weight).toBe(2)
+    expect(edgeDirections(forward)).toEqual({ forward: true, reverse: false })
+
+    const reverse = aggregateEdges([observation('1', 'b', 'a', 'fragrantica')])[0]
+    expect(edgeDirections(reverse)).toEqual({ forward: false, reverse: true })
+
+    const observations = [
+      observation('1', 'a', 'b', 'fragrantica'),
+      observation('2', 'b', 'a', 'parfumo'),
+    ]
+    expect(edgeDirections(aggregateEdges(observations)[0])).toEqual({
+      forward: true, reverse: true,
+    })
+    expect(edgeDirections(aggregateEdges(observations, new Set(['parfumo']))[0])).toEqual({
+      forward: false, reverse: true,
+    })
   })
 
   it('handles an empty collection', () => {

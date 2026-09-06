@@ -26,7 +26,7 @@ npm test
 4. Complete missing brands and review identity suggestions. Fuzzy suggestions are never merged automatically.
 5. Replace the saved list and inspect the resulting graph, evidence, shared context, and collection coverage.
 
-Observations remain directed in storage. The displayed undirected edge has a weight from 1–4: one point for each unique source and direction. A missing link means insufficient evidence, not uniqueness.
+Observations remain directed in storage. Each displayed edge points toward the referenced fragrance, with arrowheads at both ends for mutual references. Its weight is from 1–4: one point for each unique source and direction. The number and line thickness indicate evidence count, not direction; arrows reflect the enabled sources. Community detection still treats relationships as undirected. A missing link means insufficient evidence, not uniqueness.
 
 ## Privacy and backups
 

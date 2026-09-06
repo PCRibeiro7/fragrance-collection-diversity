@@ -2,7 +2,7 @@ import cytoscape, { type Core, type EventObject } from 'cytoscape'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { displayName } from '../domain/identity'
 import { CLUSTER_COLORS } from '../domain/colors'
-import { visibleGraphElements } from '../domain/graph'
+import { edgeDirections, visibleGraphElements } from '../domain/graph'
 import type { GraphModel, SelectedGraphItem } from '../domain/types'
 
 interface GraphViewProps {
@@ -86,6 +86,8 @@ export function GraphView({
             source: edge.sourceId,
             target: edge.targetId,
             weight: edge.weight,
+            sourceArrow: edgeDirections(edge).reverse ? 'triangle' : 'none',
+            targetArrow: edgeDirections(edge).forward ? 'triangle' : 'none',
             weightLabel: edge.weight > 1 ? String(edge.weight) : '',
           },
         })),
@@ -128,6 +130,11 @@ export function GraphView({
           style: {
             width: 'mapData(weight, 1, 4, 1.5, 6)',
             'line-color': '#a79c8c',
+            'source-arrow-shape': (edge) => edge.data('sourceArrow'),
+            'target-arrow-shape': (edge) => edge.data('targetArrow'),
+            'source-arrow-color': '#827565',
+            'target-arrow-color': '#827565',
+            'arrow-scale': 1.3,
             'curve-style': 'bezier',
             opacity: 0.62,
             label: 'data(weightLabel)',
@@ -146,6 +153,7 @@ export function GraphView({
             'border-width': 4,
             'line-color': '#1d1a16',
             'target-arrow-color': '#1d1a16',
+            'source-arrow-color': '#1d1a16',
             opacity: 1,
           },
         },
@@ -187,10 +195,12 @@ export function GraphView({
       const position = event.renderedPosition ?? { x: 0, y: 0 }
       const left = fragranceById.get(edge.sourceId)
       const right = fragranceById.get(edge.targetId)
+      const { forward, reverse } = edgeDirections(edge)
+      const direction = forward && reverse ? '↔' : forward ? '→' : '←'
       setTooltip({
         left: position.x + 18,
         top: position.y + 18,
-        title: `${left?.name ?? 'Unknown'} ↔ ${right?.name ?? 'Unknown'}`,
+        title: `${left?.name ?? 'Unknown'} ${direction} ${right?.name ?? 'Unknown'}`,
         evidence: edge.evidence.map((item) => {
           const from = fragranceById.get(item.fromFragranceId)
           const to = fragranceById.get(item.toFragranceId)
