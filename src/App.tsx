@@ -58,6 +58,23 @@ function App() {
     () => buildGraphModel(fragrances, observations, enabledSources),
     [enabledSources, fragrances, observations],
   )
+  const clusterOptions = useMemo(() => {
+    const connections = new globalThis.Map<string, number>()
+    for (const edge of graphModel.edges) {
+      connections.set(edge.sourceId, (connections.get(edge.sourceId) ?? 0) + 1)
+      connections.set(edge.targetId, (connections.get(edge.targetId) ?? 0) + 1)
+    }
+    return graphModel.clusters.map((cluster) => {
+      const [representative] = graphModel.nodes
+        .filter((node) => node.cluster === cluster)
+        .sort((a, b) =>
+          Number(b.owned) - Number(a.owned) ||
+          (connections.get(b.id) ?? 0) - (connections.get(a.id) ?? 0) ||
+          displayName(a).localeCompare(displayName(b)) || a.id.localeCompare(b.id),
+        )
+      return { cluster, label: displayName(representative) }
+    }).sort((a, b) => a.label.localeCompare(b.label))
+  }, [graphModel])
   const capturedKeys = useMemo(
     () => new Set(captures.map((capture) => `${capture.rootFragranceId}:${capture.source}`)),
     [captures],
@@ -212,7 +229,7 @@ function App() {
             onChange={(event) => setClusterFocus(event.target.value === 'all' ? 'all' : Number(event.target.value))}
           >
             <option value="all">All groups</option>
-            {graphModel.clusters.map((cluster) => <option key={cluster} value={cluster}>Group {String(cluster + 1).padStart(2, '0')}</option>)}
+            {clusterOptions.map(({ cluster, label }) => <option key={cluster} value={cluster}>{label}</option>)}
           </select>
           <button className="icon-button" type="button" title="Fit graph" onClick={() => setFitSignal((value) => value + 1)}><Focus size={18} /></button>
         </div>
