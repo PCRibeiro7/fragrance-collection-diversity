@@ -160,7 +160,7 @@ export function GraphView({
       ],
       minZoom: 0.25,
       maxZoom: 2.5,
-      wheelSensitivity: 0.18,
+      wheelSensitivity: 3,
     })
 
     cy.layout({
