@@ -333,3 +333,5 @@ button { color: inherit; }
   .empty-state h2 { font-size: 29px; }
   .restore-preview > div { grid-template-columns: 1fr 1fr; }
 }
+
+.boundary-legend { position: absolute; bottom: 16px; left: 16px; right: 16px; width: fit-content; padding: 8px 12px; border-radius: 8px; background: #fffdf8ed; color: #6e6458; font-size: 12px; pointer-events: none; }

@@ -22,7 +22,7 @@ import { GraphView } from './components/GraphView'
 import { Modal } from './components/Modal'
 import { createBackup, restoreBackup, validateBackup, type BackupPreview } from './data/backup'
 import { useDatabaseSnapshot } from './data/useDatabaseSnapshot'
-import { buildGraphModel } from './domain/graph'
+import { buildGraphModel, groupOptions } from './domain/graph'
 import { displayName } from './domain/identity'
 import { CLUSTER_COLORS } from './domain/colors'
 import type { SelectedGraphItem, SimilaritySource } from './domain/types'
@@ -58,23 +58,7 @@ function App() {
     () => buildGraphModel(fragrances, observations, enabledSources),
     [enabledSources, fragrances, observations],
   )
-  const clusterOptions = useMemo(() => {
-    const connections = new globalThis.Map<string, number>()
-    for (const edge of graphModel.edges) {
-      connections.set(edge.sourceId, (connections.get(edge.sourceId) ?? 0) + 1)
-      connections.set(edge.targetId, (connections.get(edge.targetId) ?? 0) + 1)
-    }
-    return graphModel.clusters.map((cluster) => {
-      const [representative] = graphModel.nodes
-        .filter((node) => node.cluster === cluster)
-        .sort((a, b) =>
-          Number(b.owned) - Number(a.owned) ||
-          (connections.get(b.id) ?? 0) - (connections.get(a.id) ?? 0) ||
-          displayName(a).localeCompare(displayName(b)) || a.id.localeCompare(b.id),
-        )
-      return { cluster, label: displayName(representative) }
-    }).sort((a, b) => a.label.localeCompare(b.label))
-  }, [graphModel])
+  const clusterOptions = useMemo(() => groupOptions(graphModel), [graphModel])
   const capturedKeys = useMemo(
     () => new Set(captures.map((capture) => `${capture.rootFragranceId}:${capture.source}`)),
     [captures],
@@ -225,11 +209,12 @@ function App() {
           <select
             className="cluster-select"
             aria-label="Focus similarity group"
+            title={clusterOptions.find((option) => option.cluster === clusterFocus)?.title}
             value={clusterFocus}
             onChange={(event) => setClusterFocus(event.target.value === 'all' ? 'all' : Number(event.target.value))}
           >
             <option value="all">All groups</option>
-            {clusterOptions.map(({ cluster, label }) => <option key={cluster} value={cluster}>{label}</option>)}
+            {clusterOptions.map(({ cluster, label, title }) => <option key={cluster} value={cluster} title={title}>{label}</option>)}
           </select>
           <button className="icon-button" type="button" title="Fit graph" onClick={() => setFitSignal((value) => value + 1)}><Focus size={18} /></button>
         </div>

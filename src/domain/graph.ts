@@ -126,16 +126,22 @@ export function visibleGraphElements(
   showContext: boolean,
   clusterFocus: number | 'all',
 ): { nodes: GraphModel['nodes']; edges: AggregatedEdge[] } {
-  const nodes = model.nodes.filter(
-    (node) =>
-      (showContext || node.owned) &&
-      (clusterFocus === 'all' || node.cluster === clusterFocus),
-  )
+  const eligible = model.nodes.filter((node) => showContext || node.owned)
+  const focusedIds = new Set(eligible
+    .filter((node) => clusterFocus === 'all' || node.cluster === clusterFocus)
+    .map((node) => node.id))
+  const visibleIds = new Set(focusedIds)
+  for (const edge of model.edges) {
+    if (focusedIds.has(edge.sourceId)) visibleIds.add(edge.targetId)
+    if (focusedIds.has(edge.targetId)) visibleIds.add(edge.sourceId)
+  }
+  const nodes = eligible.filter((node) => visibleIds.has(node.id))
   const nodeIds = new Set(nodes.map((node) => node.id))
   return {
     nodes,
-    edges: model.edges.filter(
-      (edge) => nodeIds.has(edge.sourceId) && nodeIds.has(edge.targetId),
+    edges: model.edges.filter((edge) =>
+      nodeIds.has(edge.sourceId) && nodeIds.has(edge.targetId) &&
+      (focusedIds.has(edge.sourceId) || focusedIds.has(edge.targetId)),
     ),
   }
 }
@@ -168,4 +174,32 @@ export function findSharedNeighbors(
     }))
     .filter((result) => result.sharedIds.length > 0)
     .sort((a, b) => b.sharedIds.length - a.sharedIds.length)
+}
+
+export function groupOptions(model: GraphModel) {
+  const shortName = (node: Fragrance) =>
+    `${node.name}${node.variant ? ` (${node.variant})` : ''}`
+  const names = new Map<string, number>()
+  for (const node of model.nodes) {
+    const key = shortName(node).toLocaleLowerCase()
+    names.set(key, (names.get(key) ?? 0) + 1)
+  }
+  const labelFor = (node: Fragrance) =>
+    (names.get(shortName(node).toLocaleLowerCase()) ?? 0) > 1
+      ? `${node.brand} \u00b7 ${shortName(node)}` : shortName(node)
+  return model.clusters.map((cluster) => {
+    const members = model.nodes.filter((node) => node.cluster === cluster)
+    const owned = members.filter((node) => node.owned)
+    const labels = (owned.length ? owned : members)
+      .sort((a, b) => shortName(a).localeCompare(shortName(b)) ||
+        a.brand.localeCompare(b.brand) || a.id.localeCompare(b.id))
+      .map(labelFor)
+    const suffix = owned.length ? '' : ' (context only)'
+    return {
+      cluster,
+      label: labels.slice(0, 2).join(' + ') +
+        (labels.length > 2 ? ` + ${labels.length - 2} more` : '') + suffix,
+      title: labels.join(' + ') + suffix,
+    }
+  }).sort((a, b) => a.label.localeCompare(b.label))
 }

@@ -70,6 +70,7 @@ export function GraphView({
       elements: [
         ...visibleNodes.map((node) => ({
           group: 'nodes' as const,
+          classes: clusterFocus !== 'all' && node.cluster !== clusterFocus ? 'boundary' : '',
           data: {
             id: node.id,
             label: node.name,
@@ -81,6 +82,9 @@ export function GraphView({
         })),
         ...visibleEdges.map((edge) => ({
           group: 'edges' as const,
+          classes: clusterFocus !== 'all' &&
+            [edge.sourceId, edge.targetId].some((id) => fragranceById.get(id)?.cluster !== clusterFocus)
+            ? 'boundary' : '',
           data: {
             id: edge.id,
             source: edge.sourceId,
@@ -145,6 +149,14 @@ export function GraphView({
             'text-background-padding': '2px',
             'overlay-opacity': 0,
           },
+        },
+        {
+          selector: 'node.boundary',
+          style: { opacity: 0.45, 'border-style': 'dashed' },
+        },
+        {
+          selector: 'edge.boundary',
+          style: { opacity: 0.3, 'line-style': 'dashed' },
         },
         {
           selector: ':selected',
@@ -252,6 +264,9 @@ export function GraphView({
   return (
     <div className="graph-stage">
       <div ref={containerRef} className="graph-canvas" aria-label="Fragrance similarity graph" />
+      {clusterFocus !== 'all' && visibleGraphElements(model, showContext, clusterFocus).nodes.some(
+        (node) => node.cluster !== clusterFocus,
+      ) && <div className="boundary-legend">Faded nodes connect to this group but belong to another group.</div>}
       {tooltip && (
         <div className="edge-tooltip" style={{ left: tooltip.left, top: tooltip.top }}>
           <strong>{tooltip.title}</strong>

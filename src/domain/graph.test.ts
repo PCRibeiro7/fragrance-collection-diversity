@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggregateEdges, edgeDirections, buildGraphModel, findSharedNeighbors, visibleGraphElements } from './graph'
+import { aggregateEdges, groupOptions, edgeDirections, buildGraphModel, findSharedNeighbors, visibleGraphElements } from './graph'
 import type { Fragrance, SimilarityObservation } from './types'
 
 const now = '2026-01-01T00:00:00.000Z'
@@ -120,5 +120,48 @@ describe('graph derivation', () => {
 
   it('handles an empty collection', () => {
     expect(buildGraphModel([], [])).toEqual({ nodes: [], edges: [], clusters: [] })
+  })
+})
+
+describe('group navigation', () => {
+  it('names groups using owned fragrances alphabetically and exposes every name', () => {
+    const nodes = [fragrance('Eros Energy'), fragrance('Aventus'), fragrance('Explorer', false)]
+      .map((node) => ({ ...node, cluster: 0 }))
+    const model = { nodes, edges: [], clusters: [0] }
+    expect(groupOptions(model)[0].label).toBe('Aventus + Eros Energy')
+    nodes.push({ ...fragrance('Hacivat'), cluster: 0 })
+    expect(groupOptions(model)[0]).toMatchObject({
+      label: 'Aventus + Eros Energy + 1 more',
+      title: 'Aventus + Eros Energy + Hacivat',
+    })
+  })
+
+  it('disambiguates names across groups and labels context-only groups', () => {
+    const nodes = [
+      { ...fragrance('a'), name: 'Homme', brand: 'Dior', cluster: 0 },
+      { ...fragrance('b', false), name: 'Homme', brand: 'Issey Miyake', cluster: 1 },
+    ]
+    expect(groupOptions({ nodes, edges: [], clusters: [0, 1] }).map((group) => group.label))
+      .toEqual(['Dior \u00b7 Homme', 'Issey Miyake \u00b7 Homme (context only)'])
+  })
+
+  it('includes only direct boundary neighbors and respects the context toggle', () => {
+    const nodes = ['a', 'b', 'c', 'd'].map((id, index) => ({
+      ...fragrance(id, id !== 'c'), cluster: index === 0 ? 0 : 1,
+    }))
+    const edges = aggregateEdges([
+      observation('1', 'a', 'b', 'fragrantica'),
+      observation('2', 'c', 'a', 'fragrantica'),
+      observation('3', 'b', 'c', 'fragrantica'),
+      observation('4', 'b', 'd', 'fragrantica'),
+    ])
+    const model = { nodes, edges, clusters: [0, 1] }
+    const focused = visibleGraphElements(model, true, 0)
+    expect(focused.nodes.map((node) => node.id)).toEqual(['a', 'b', 'c'])
+    expect(focused.edges).toHaveLength(2)
+    expect(visibleGraphElements(model, false, 0).nodes.map((node) => node.id)).toEqual(['a', 'b'])
+    expect(visibleGraphElements(model, false, 0).edges).toHaveLength(1)
+    expect(visibleGraphElements(model, true, 'all').edges).toHaveLength(4)
+    expect(visibleGraphElements(model, true, 99)).toEqual({ nodes: [], edges: [] })
   })
 })
