@@ -240,7 +240,7 @@ function App() {
             <div className="empty-orbit"><span /><span /><span /><Map size={34} /></div>
             <p className="eyebrow">A clearer collection starts here</p>
             <h2>Map what your nose already knows.</h2>
-            <p>Add an owned fragrance, then paste its community similarity lists. Relationships become a map—not a verdict.</p>
+            <p>Add an owned fragrance and its community similarity lists together. Relationships become a map—not a verdict.</p>
             <button className="button button--primary" type="button" onClick={() => setShowAdd(true)}><Plus size={16} /> Add your first fragrance</button>
           </section>
         )}

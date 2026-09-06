@@ -173,3 +173,17 @@ export async function setOwned(
     updatedAt: new Date().toISOString(),
   })
 }
+
+export async function saveFragranceWithRelationships(
+  input: FragranceInput,
+  lists: Omit<ReplaceCaptureInput, 'rootFragranceId'>[],
+  database: ScentMapDatabase = db,
+): Promise<Fragrance> {
+  return database.transaction('rw', database.fragrances, database.captures, database.observations, async () => {
+    const fragrance = await upsertFragrance(input, database)
+    for (const list of lists) {
+      await replaceCapture({ ...list, rootFragranceId: fragrance.id }, database)
+    }
+    return fragrance
+  })
+}

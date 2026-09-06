@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ScentMapDatabase } from './db'
-import { replaceCapture, upsertFragrance } from './repository'
+import { replaceCapture, upsertFragrance, saveFragranceWithRelationships } from './repository'
 
 let database: ScentMapDatabase
 
@@ -61,5 +61,34 @@ describe('capture repository', () => {
       ],
     }, database)
     expect(await database.observations.count()).toBe(1)
+  })
+})
+
+describe('combined fragrance save', () => {
+  it('saves both sources together and reuses shared targets', async () => {
+    const root = await saveFragranceWithRelationships({ brand: 'Root', name: 'One', owned: true }, [
+      { source: 'fragrantica', targets: [{ brand: 'Shared', name: 'Target' }] },
+      { source: 'parfumo', targets: [{ brand: 'Shared', name: 'Target' }] },
+    ], database)
+    expect(root.owned).toBe(true)
+    expect(await database.fragrances.count()).toBe(2)
+    expect(await database.captures.count()).toBe(2)
+    expect(await database.observations.count()).toBe(2)
+  })
+
+  it('rolls back the fragrance and first source if the second source fails', async () => {
+    await expect(saveFragranceWithRelationships({ brand: 'Root', name: 'One', owned: true }, [
+      { source: 'fragrantica', targets: [{ brand: 'Brand', name: 'Target' }] },
+      { source: 'parfumo', targets: [{ brand: '', name: 'Invalid' }] },
+    ], database)).rejects.toThrow('both a brand and a name')
+    expect(await database.fragrances.count()).toBe(0)
+    expect(await database.captures.count()).toBe(0)
+    expect(await database.observations.count()).toBe(0)
+  })
+
+  it('allows saving without relationships', async () => {
+    await saveFragranceWithRelationships({ brand: 'Root', name: 'One', owned: true }, [], database)
+    expect(await database.fragrances.count()).toBe(1)
+    expect(await database.captures.count()).toBe(0)
   })
 })

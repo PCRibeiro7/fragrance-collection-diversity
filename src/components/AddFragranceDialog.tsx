@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
+import { parseSimilarityList, type ParsedSimilarityLine } from '../domain/parser'
+import type { SimilaritySource } from '../domain/types'
 import { Modal } from './Modal'
-import { upsertFragrance } from '../data/repository'
+import { saveFragranceWithRelationships } from '../data/repository'
 import { validateHttpUrl } from '../domain/identity'
 
 interface AddFragranceDialogProps {
@@ -14,6 +16,9 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
   const [variant, setVariant] = useState('')
   const [fragranticaUrl, setFragranticaUrl] = useState('')
   const [parfumoUrl, setParfumoUrl] = useState('')
+  const [lists, setLists] = useState<Record<SimilaritySource, { text: string; rows: ParsedSimilarityLine[] }>>({
+    fragrantica: { text: '', rows: [] }, parfumo: { text: '', rows: [] },
+  })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -29,15 +34,26 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
       return
     }
 
+    for (const source of ['fragrantica', 'parfumo'] as const) {
+      const list = lists[source]
+      if ((list.text.trim() && !list.rows.length) || list.rows.some((row) => !row.brand.trim() || !row.name.trim())) {
+        setError(`Complete the brand and name for each ${source === 'fragrantica' ? 'Fragrantica' : 'Parfumo'} relationship.`)
+        return
+      }
+    }
     try {
       setSaving(true)
-      const fragrance = await upsertFragrance({
+      const fragrance = await saveFragranceWithRelationships({
         brand,
         name,
         variant,
         owned: true,
         sourceUrls: { fragrantica: fragranticaUrl, parfumo: parfumoUrl },
-      })
+      }, (['fragrantica', 'parfumo'] as const).filter((source) => lists[source].rows.length > 0).map((source) => ({
+        source,
+        pageUrl: source === 'fragrantica' ? fragranticaUrl : parfumoUrl,
+        targets: lists[source].rows,
+      })))
       onSaved?.(fragrance.id)
       onClose()
     } catch (caught) {
@@ -58,7 +74,7 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
             Cancel
           </button>
           <button className="button button--primary" type="submit" form="add-fragrance" disabled={saving}>
-            {saving ? 'Saving…' : 'Add fragrance'}
+            {saving ? 'Saving…' : 'Save fragrance and relationships'}
           </button>
         </>
       }
@@ -99,6 +115,35 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
             />
           </label>
         </div>
+        <p className="review-help">Add similarity lists below to save the fragrance and its relationships together. Both lists are optional.</p>
+        {(['fragrantica', 'parfumo'] as const).map((source) => (
+          <div className="form-stack" key={source}>
+            <label className="field">
+              <span>{source === 'fragrantica' ? 'Fragrantica' : 'Parfumo'} relationships <em>optional</em></span>
+              <textarea rows={4} value={lists[source].text}
+                placeholder={'Brand | Fragrance\nBrand | Another fragrance'}
+                onChange={(event) => {
+                  const text = event.target.value
+                  setLists((current) => ({ ...current, [source]: { text, rows: parseSimilarityList(text) } }))
+                }} />
+              <small>Paste a similarity list or enter one Brand | Fragrance per line. Check the parsed entries below before saving.</small>
+            </label>
+            {lists[source].rows.map((row) => (
+              <div className="field-row" key={row.id}>
+                {(['brand', 'name', 'variant'] as const).map((field) => (
+                  <label className="field" key={field}>
+                    <span>{field === 'brand' ? 'Brand' : field === 'name' ? 'Fragrance name' : 'Variant'}</span>
+                    <input aria-label={`${source} ${field} for ${row.raw}`} value={row[field]}
+                      onChange={(event) => setLists((current) => ({ ...current, [source]: {
+                        ...current[source], rows: current[source].rows.map((item) => item.id === row.id ? { ...item, [field]: event.target.value } : item),
+                      } }))} />
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
+        ))}
+        <p className="review-help">Exact brand, name, and variant matches reuse existing fragrances. Adding a list for an existing fragrance replaces that source's saved relationships.</p>
         {error && <p className="form-error">{error}</p>}
       </form>
     </Modal>
