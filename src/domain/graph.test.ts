@@ -72,6 +72,29 @@ describe('graph derivation', () => {
     expect(visibleGraphElements(model, true, 'all').edges).toHaveLength(2)
   })
 
+  it('includes shared context even when owned fragrances are directly related', () => {
+    const fragrances = [
+      fragrance('Eros Energy'),
+      fragrance('Aventus'),
+      fragrance('Cedrat Boise', false),
+      fragrance('Outlands'),
+    ]
+    const edges = aggregateEdges([
+      observation('1', 'Eros Energy', 'Aventus', 'fragrantica'),
+      observation('2', 'Aventus', 'Eros Energy', 'fragrantica'),
+      observation('3', 'Eros Energy', 'Cedrat Boise', 'fragrantica'),
+      observation('4', 'Aventus', 'Cedrat Boise', 'fragrantica'),
+    ])
+
+    expect(findSharedNeighbors('Eros Energy', fragrances, edges)).toEqual([
+      { fragranceId: 'Aventus', sharedIds: ['Cedrat Boise'] },
+    ])
+    expect(findSharedNeighbors('Aventus', fragrances, edges)).toEqual([
+      { fragranceId: 'Eros Energy', sharedIds: ['Cedrat Boise'] },
+    ])
+    expect(findSharedNeighbors('Outlands', fragrances, edges)).toEqual([])
+  })
+
   it('handles an empty collection', () => {
     expect(buildGraphModel([], [])).toEqual({ nodes: [], edges: [], clusters: [] })
   })

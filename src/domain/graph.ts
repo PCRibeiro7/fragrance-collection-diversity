@@ -150,7 +150,7 @@ export function findSharedNeighbors(
 ): SharedNeighborResult[] {
   const selectedNeighbors = directNeighborIds(nodeId, edges)
   return fragrances
-    .filter((item) => item.owned && item.id !== nodeId && !selectedNeighbors.has(item.id))
+    .filter((item) => item.owned && item.id !== nodeId)
     .map((item) => ({
       fragranceId: item.id,
       sharedIds: [...directNeighborIds(item.id, edges)].filter((id) => selectedNeighbors.has(id)),

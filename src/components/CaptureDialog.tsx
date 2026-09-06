@@ -249,7 +249,8 @@ export function CaptureDialog({
               placeholder={'Diptyque | Philosykos\nPremier Figuier\nHermès | Un Jardin en Méditerranée'}
             />
             <small>
-              One per line. Use <code>Brand | Fragrance</code> when possible; you can complete and verify every identity next.
+              Paste Fragrantica's "This perfume reminds me of" section directly, including vote counts and Compare labels.
+              You can also enter one <code>Brand | Fragrance</code> per line. Review and edit the matches next.
             </small>
           </label>
           <div className="privacy-note">

@@ -12,9 +12,26 @@ export function parseSimilarityList(text: string): ParsedSimilarityLine[] {
   const seen = new Set<string>()
   const parsed: ParsedSimilarityLine[] = []
 
-  for (const [index, rawLine] of text.split(/\r?\n/).entries()) {
-    const raw = rawLine.trim()
-    if (!raw) continue
+  const lines = text.split(/\r\n?|\n/).map((line) => line.trim()).filter(Boolean)
+  const isCard = (index: number) => {
+    const [heading, brand, name] = lines.slice(index, index + 3)
+    return Boolean(
+      heading && brand && name &&
+      /^perfume\s+/i.test(heading) &&
+      heading.replace(/^perfume\s+/i, '').toLocaleLowerCase() ===
+        `${name} ${brand}`.toLocaleLowerCase(),
+    )
+  }
+  const fragranticaPaste = lines.some((_, index) => isCard(index))
+
+  for (let index = 0; index < lines.length; index += 1) {
+    let raw = lines[index]
+    if (fragranticaPaste && isCard(index)) {
+      raw = `${lines[index + 1]} | ${lines[index + 2]}`
+      index += 2
+    } else if (fragranticaPaste && /^(?:This perfume reminds me of|Suggest|Compare|\d[\d.,\s]*k?)$/i.test(raw)) {
+      continue
+    }
 
     const dividerIndex = raw.indexOf('|')
     const brand = dividerIndex >= 0 ? raw.slice(0, dividerIndex).trim() : ''

@@ -140,7 +140,7 @@ export function DetailsPanel({ selection, model, onClose, onCapture }: DetailsPa
             ))}
           </div>
         ) : (
-          <p className="empty-detail">No indirect overlap through shared neighbors yet.</p>
+          <p className="empty-detail">No shared connections with other owned fragrances yet.</p>
         )}
       </section>
     </aside>
