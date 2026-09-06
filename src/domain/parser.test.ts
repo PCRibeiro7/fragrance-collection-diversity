@@ -98,6 +98,33 @@ describe('similarity list parser', () => {
     ])
   })
 
+
+  it('parses Parfumo clipboard cards with aliases, concentrations, and Unicode', () => {
+    const entries = [
+      ['Marwa (Eau de Parfum) / \u0645\u0631\u0648\u0629', 'Arabiyat Prestige', 'Marwa Eau de Parfum'],
+      ['Pure Vision', 'C\u00e2line', 'Pure Vision'],
+      ['Hawas Kobra / \u0647\u0648\u0633', 'Rasasi', 'Hawas Kobra'],
+      ['Marwa (Extrait) / \u0645\u0631\u0648\u0629', 'Arabiyat Prestige', 'Marwa Extrait'],
+      ['Citrus Assam / Citrus Ceylon', 'Avapari', 'Citrus Assam'],
+      ['#Imagine', 'The Dua Brand', '#Imagine'],
+      ["L'Enfant Terrible", 'Givenchy', "L'Enfant Terrible"],
+      ['Sunrise on the Red Sand Dunes (Eau de Parfum)', 'Zara', 'Sunrise on the Red Sand Dunes Eau de Parfum'],
+      ['Scent 4', 'Mij\u00f5u Fragrances', 'Scent 4'],
+    ]
+    const text = entries.flatMap(([title, brand, name]) => [`${title} by ${brand}`, name]).join('\r\n\r\n')
+    expect(parseSimilarityList(text).map(({ brand, name }) => ({ brand, name }))).toEqual(
+      entries.map(([, brand, name]) => ({ brand, name })),
+    )
+  })
+
+  it('deduplicates Parfumo cards with manual entries and preserves unrelated rows', () => {
+    expect(parseSimilarityList('Pure Vision by Caline\nPure Vision\nCaline | Pure Vision\nOther fragrance'))
+      .toMatchObject([{ brand: 'Caline', name: 'Pure Vision' }, { brand: '', name: 'Other fragrance' }])
+    expect(parseSimilarityList('Somebody by Night\nOther fragrance')).toMatchObject([
+      { brand: '', name: 'Somebody by Night' }, { brand: '', name: 'Other fragrance' },
+    ])
+  })
+
   it('only offers fuzzy similarity as a score, never an identity decision', () => {
     expect(similarityScore('Dior Sauvage', 'Dior Sauvage EDP')).toBeGreaterThan(0.7)
     expect(similarityScore('Dior Sauvage', 'Guerlain Shalimar')).toBeLessThan(0.5)

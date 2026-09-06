@@ -26,7 +26,19 @@ export function parseSimilarityList(text: string): ParsedSimilarityLine[] {
 
   for (let index = 0; index < lines.length; index += 1) {
     let raw = lines[index]
-    if (fragranticaPaste && isCard(index)) {
+    // Parfumo copies a title followed by its visible name. Match the pair
+    // before consuming either line so unrelated name-only rows remain intact.
+    const byIndex = raw.toLocaleLowerCase().lastIndexOf(' by ')
+    const title = raw.slice(0, byIndex).trim()
+    const parfumoBrand = raw.slice(byIndex + 4).trim()
+    const displayName = lines[index + 1]
+    const normalizeTitle = (value: string) => value.replace(/[()]/g, '').replace(/\s+/g, ' ').trim().toLocaleLowerCase()
+    const parfumoCard = !raw.includes('|') && byIndex > 0 && parfumoBrand && displayName &&
+      [title, ...title.split(/\s+\/\s+/)].some((name) => normalizeTitle(name) === normalizeTitle(displayName))
+    if (parfumoCard) {
+      raw = `${parfumoBrand} | ${displayName}`
+      index += 1
+    } else if (fragranticaPaste && isCard(index)) {
       raw = `${lines[index + 1]} | ${lines[index + 2]}`
       index += 2
     } else if (fragranticaPaste && /^(?:This perfume reminds me of|Suggest|Compare|\d[\d.,\s]*k?)$/i.test(raw)) {

@@ -246,10 +246,12 @@ export function CaptureDialog({
               rows={11}
               value={text}
               onChange={(event) => setText(event.target.value)}
-              placeholder={'Diptyque | Philosykos\nPremier Figuier\nHermès | Un Jardin en Méditerranée'}
+              placeholder={source === 'parfumo' ? 'Pure Vision by C\u00e2line\nPure Vision\nFantasme by Maison Alhambra\nFantasme' : 'Diptyque | Philosykos\nPremier Figuier\nHermès | Un Jardin en Méditerranée'}
             />
             <small>
-              Paste Fragrantica's "This perfume reminds me of" section directly, including vote counts and Compare labels.
+              {source === 'parfumo'
+                ? 'Paste directly from Parfumo, including the "Fragrance by Brand" lines and repeated fragrance names. '
+                : 'Paste Fragrantica\'s "This perfume reminds me of" section directly, including vote counts and Compare labels. '}
               You can also enter one <code>Brand | Fragrance</code> per line. Review and edit the matches next.
             </small>
           </label>

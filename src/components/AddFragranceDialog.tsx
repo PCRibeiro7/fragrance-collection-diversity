@@ -121,12 +121,12 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
             <label className="field">
               <span>{source === 'fragrantica' ? 'Fragrantica' : 'Parfumo'} relationships <em>optional</em></span>
               <textarea rows={4} value={lists[source].text}
-                placeholder={'Brand | Fragrance\nBrand | Another fragrance'}
+                placeholder={source === 'parfumo' ? 'Pure Vision by C\u00e2line\nPure Vision\nFantasme by Maison Alhambra\nFantasme' : 'Brand | Fragrance\nBrand | Another fragrance'}
                 onChange={(event) => {
                   const text = event.target.value
                   setLists((current) => ({ ...current, [source]: { text, rows: parseSimilarityList(text) } }))
                 }} />
-              <small>Paste a similarity list or enter one Brand | Fragrance per line. Check the parsed entries below before saving.</small>
+              <small>{source === 'parfumo' && 'Copy directly from Parfumo, including the "Fragrance by Brand" lines and repeated names. '}Paste a similarity list or enter one Brand | Fragrance per line. Check the parsed entries below before saving.</small>
             </label>
             {lists[source].rows.map((row) => (
               <div className="field-row" key={row.id}>
