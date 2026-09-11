@@ -1,8 +1,9 @@
-import { ArrowRight, ExternalLink, Link2, Network, Plus, X } from 'lucide-react'
+import { useState } from 'react'
+import { Trash2, ArrowRight, ExternalLink, Link2, Network, Plus, X } from 'lucide-react'
 import { displayName } from '../domain/identity'
 import { directNeighborIds, findSharedNeighbors } from '../domain/graph'
 import type { GraphModel, SelectedGraphItem, SimilaritySource } from '../domain/types'
-import { setOwned } from '../data/repository'
+import { deleteFragrance, setOwned } from '../data/repository'
 import { CLUSTER_COLORS } from '../domain/colors'
 
 interface DetailsPanelProps {
@@ -13,6 +14,8 @@ interface DetailsPanelProps {
 }
 
 export function DetailsPanel({ selection, model, onClose, onCapture }: DetailsPanelProps) {
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const fragranceById = new Map(model.nodes.map((node) => [node.id, node]))
 
   if (selection.type === 'edge') {
@@ -68,6 +71,21 @@ export function DetailsPanel({ selection, model, onClose, onCapture }: DetailsPa
   const fragranceId = fragrance.id
   const isOwned = fragrance.owned
 
+  async function handleDelete() {
+    if (!fragrance || deleting) return
+    if (!window.confirm(`Permanently delete ${displayName(fragrance)}? Its captures and relationships will also be deleted.${fragrance.owned ? ' Related context fragrances left without relationships or captures will also be deleted.' : ''} This cannot be undone.`)) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await deleteFragrance(fragranceId)
+      onClose()
+    } catch (caught) {
+      setDeleteError(caught instanceof Error ? caught.message : 'Could not delete this fragrance. Please try again.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   async function toggleOwned() {
     if (isOwned && !window.confirm('Remove this fragrance from your owned collection? Its relationship data will be kept as context.')) return
     await setOwned(fragranceId, !isOwned)
@@ -87,12 +105,16 @@ export function DetailsPanel({ selection, model, onClose, onCapture }: DetailsPa
       </div>
 
       <div className="details-actions">
-        <button className="button button--primary button--full" type="button" onClick={() => onCapture(fragrance.id)} disabled={!fragrance.owned}>
+        <button className="button button--primary button--full" type="button" onClick={() => onCapture(fragrance.id)} disabled={!fragrance.owned || deleting}>
           <Plus size={15} /> Capture relationships
         </button>
-        <button className="button button--quiet button--full" type="button" onClick={toggleOwned}>
+        <button className="button button--quiet button--full" type="button" onClick={toggleOwned} disabled={deleting}>
           {fragrance.owned ? 'Remove from collection' : 'Mark as owned'}
         </button>
+        <button className="button button--danger button--full" type="button" onClick={handleDelete} disabled={deleting}>
+          <Trash2 size={15} /> {deleting ? 'Deleting...' : 'Delete fragrance'}
+        </button>
+        {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
       </div>
 
       {(fragrance.sourceUrls.fragrantica || fragrance.sourceUrls.parfumo) && (

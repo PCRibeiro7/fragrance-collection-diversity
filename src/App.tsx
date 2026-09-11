@@ -250,7 +250,7 @@ function App() {
         <div className="map-disclaimer"><CircleHelp size={14} /> No link means unknown, not unique.</div>
       </main>
 
-      {selected && <DetailsPanel selection={selected} model={graphModel} onClose={() => setSelected(null)} onCapture={openCapture} />}
+      {selected && <DetailsPanel key={`${selected.type}:${selected.id}`} selection={selected} model={graphModel} onClose={() => setSelected(null)} onCapture={openCapture} />}
       {showAdd && <AddFragranceDialog onClose={() => setShowAdd(false)} onSaved={(id) => setSelected({ type: 'node', id })} />}
       {selectedTarget && (
         <CaptureDialog

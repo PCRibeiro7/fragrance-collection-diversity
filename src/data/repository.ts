@@ -187,3 +187,43 @@ export async function saveFragranceWithRelationships(
     return fragrance
   })
 }
+
+export async function deleteFragrance(
+  fragranceId: string,
+  database: ScentMapDatabase = db,
+): Promise<void> {
+  await database.transaction('rw', database.fragrances, database.captures, database.observations, async () => {
+    const fragrance = await database.fragrances.get(fragranceId)
+    if (!fragrance) return
+    const relatedIds = new Set<string>()
+    if (fragrance.owned) {
+      const observations = await database.observations
+        .where('fromFragranceId').equals(fragranceId)
+        .or('toFragranceId').equals(fragranceId).toArray()
+      for (const observation of observations) {
+        relatedIds.add(observation.fromFragranceId)
+        relatedIds.add(observation.toFragranceId)
+      }
+      relatedIds.delete(fragranceId)
+    }
+
+    await database.observations.where('fromFragranceId').equals(fragranceId).delete()
+    await database.observations.where('toFragranceId').equals(fragranceId).delete()
+    await database.captures.where('rootFragranceId').equals(fragranceId).delete()
+    await database.fragrances.delete(fragranceId)
+
+    if (relatedIds.size) {
+      const [related, observations, captures] = await Promise.all([
+        database.fragrances.bulkGet([...relatedIds]),
+        database.observations.toArray(),
+        database.captures.toArray(),
+      ])
+      const referencedIds = new Set(observations.flatMap((item) => [item.fromFragranceId, item.toFragranceId]))
+      const captureRootIds = new Set(captures.map((item) => item.rootFragranceId))
+      const orphanIds = related.flatMap((item) =>
+        item && !item.owned && !referencedIds.has(item.id) && !captureRootIds.has(item.id) ? [item.id] : [],
+      )
+      await database.fragrances.bulkDelete(orphanIds)
+    }
+  })
+}
