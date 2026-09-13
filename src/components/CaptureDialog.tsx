@@ -1,3 +1,5 @@
+import { useDuplicateReviewState } from '../data/useDuplicateReviewState'
+import { resolveKnownIdentity } from '../data/duplicateDecisions'
 import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { replaceCapture } from '../data/repository'
@@ -5,6 +7,7 @@ import { displayName, identityKey, validateHttpUrl } from '../domain/identity'
 import { parseSimilarityList, similarityScore } from '../domain/parser'
 import type {
   Fragrance,
+  FragranceAlias,
   SimilarityObservation,
   SimilaritySource,
   SourceCapture,
@@ -35,9 +38,9 @@ function findSuggestions(
   name: string,
   variant: string,
   fragrances: Fragrance[],
+  aliases: FragranceAlias[],
 ): { exact?: Fragrance; suggestions: Fragrance[] } {
-  const key = identityKey({ brand, name, variant })
-  const exact = brand ? fragrances.find((item) => identityKey(item) === key) : undefined
+  const exact = brand ? resolveKnownIdentity({ brand, name, variant }, fragrances, aliases) : undefined
   const query = `${brand} ${name} ${variant}`.trim()
   const suggestions = fragrances
     .map((item) => ({ item, score: similarityScore(query, `${item.brand} ${item.name} ${item.variant ?? ''}`) }))
@@ -56,6 +59,7 @@ export function CaptureDialog({
   observations,
   onClose,
 }: CaptureDialogProps) {
+  const reviewState = useDuplicateReviewState()
   const [source, setSource] = useState<SimilaritySource>(initialSource)
   const [pageUrl, setPageUrl] = useState(root.sourceUrls[initialSource] ?? '')
   const [text, setText] = useState('')
@@ -71,11 +75,11 @@ export function CaptureDialog({
       new Set(
         currentCapture
           ? observations
-              .filter((observation) => observation.captureId === currentCapture.id)
+              .filter((observation) => observation.fromFragranceId === root.id && observation.source === source)
               .map((observation) => observation.toFragranceId)
           : [],
       ),
-    [currentCapture, observations],
+    [currentCapture, observations, root.id, source],
   )
   const fragranceById = useMemo(
     () => new Map(fragrances.map((fragrance) => [fragrance.id, fragrance])),
@@ -102,7 +106,7 @@ export function CaptureDialog({
     }
     setRows(
       parsed.map((line) => {
-        const matches = findSuggestions(line.brand, line.name, line.variant, fragrances)
+        const matches = findSuggestions(line.brand, line.name, line.variant, fragrances, reviewState.aliases)
         return {
           ...line,
           existingId: matches.exact?.id ?? '',
@@ -118,7 +122,7 @@ export function CaptureDialog({
         if (row.id !== id) return row
         const updated = { ...row, ...patch }
         if ('brand' in patch || 'name' in patch || 'variant' in patch) {
-          const matches = findSuggestions(updated.brand, updated.name, updated.variant, fragrances)
+          const matches = findSuggestions(updated.brand, updated.name, updated.variant, fragrances, reviewState.aliases)
           updated.existingId = matches.exact?.id ?? ''
           updated.suggestions = matches.suggestions
         }
@@ -195,7 +199,7 @@ export function CaptureDialog({
       <button className="button button--quiet" type="button" onClick={onClose}>
         Cancel
       </button>
-      <button className="button button--primary" type="button" onClick={beginReview}>
+      <button className="button button--primary" type="button" disabled={reviewState.loading || Boolean(reviewState.error)} onClick={beginReview}>
         Review matches <ArrowRight size={16} />
       </button>
     </>
@@ -231,7 +235,7 @@ export function CaptureDialog({
             <Sparkles size={17} />
             <span>
               {currentCapture
-                ? `Replacing ${currentTargetIds.size} saved relationships from ${new Date(currentCapture.capturedAt).toLocaleDateString()}.`
+                ? `Replacing ${currentTargetIds.size} saved relationships across all saved captures for this source.`
                 : 'No list has been captured from this source yet.'}
             </span>
           </div>
@@ -300,10 +304,10 @@ export function CaptureDialog({
                   value={row.existingId}
                   onChange={(event) => updateRow(row.id, { existingId: event.target.value })}
                 >
-                  <option value="">Create as new context</option>
+                  <option value="">Resolve exact name or create context</option>
                   {row.existingId && !row.suggestions.some((item) => item.id === row.existingId) && (
                     <option value={row.existingId}>
-                      Exact · {displayName(fragranceById.get(row.existingId)!)}
+                      Recognized · {displayName(fragranceById.get(row.existingId)!)}
                     </option>
                   )}
                   {row.suggestions.map((item) => (
@@ -313,10 +317,10 @@ export function CaptureDialog({
               </div>
             ))}
           </div>
-          <p className="review-help">Possible matches are never selected automatically. Exact matches require the same normalized brand, name, and variant.</p>
+          <p className="review-help">Possible matches are never selected automatically. Recognized matches use an exact current or previously merged brand, name, and variant. To reuse a previous name for a separate fragrance, stop recognizing it in fragrance details first.</p>
         </div>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {(error || reviewState.error) && <p className="form-error">{error || reviewState.error}</p>}
     </Modal>
   )
 }

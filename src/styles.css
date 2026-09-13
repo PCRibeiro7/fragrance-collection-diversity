@@ -335,3 +335,16 @@ button { color: inherit; }
 }
 
 .boundary-legend { position: absolute; bottom: 16px; left: 16px; right: 16px; width: fit-content; padding: 8px 12px; border-radius: 8px; background: #fffdf8ed; color: #6e6458; font-size: 12px; pointer-events: none; }
+
+.duplicate-card { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-wrap: anywhere; }
+.duplicate-card p { margin: 0; }
+.duplicate-warning { color: #86500b; }
+.duplicate-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.duplicate-options { border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.duplicate-option { display: flex; gap: 12px; padding: 12px 0; align-items: flex-start; overflow-wrap: anywhere; }
+.duplicate-option span { min-width: 0; }
+.duplicate-option small { display: block; margin-top: 6px; }
+
+.duplicate-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.duplicate-tabs button { white-space: normal; }
+.duplicate-card details small { display: block; margin: 6px 0; }

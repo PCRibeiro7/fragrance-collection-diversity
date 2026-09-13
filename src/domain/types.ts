@@ -86,3 +86,53 @@ export type SelectedGraphItem =
   | { type: 'node'; id: string }
   | { type: 'edge'; id: string }
   | null
+
+export interface DuplicateDismissal {
+  id: string
+  leftId: string
+  rightId: string
+  left: Fragrance
+  right: Fragrance
+  dismissedAt: string
+}
+
+export interface FragranceAlias {
+  id: string
+  identity: Pick<Fragrance, 'brand' | 'name' | 'variant'>
+  fragranceId: string
+  mergeEventId: string
+}
+
+export interface MergeEvent {
+  id: string
+  mergedAt: string
+  undoneAt?: string
+  kept: Fragrance
+  removed: Fragrance
+  result: Fragrance
+  currentSurvivorId: string
+  captureCount: number
+  observationCount: number
+}
+
+export interface RecoveryState {
+  fragrances: Fragrance[]
+  captures: SourceCapture[]
+  observations: SimilarityObservation[]
+  dismissals: DuplicateDismissal[]
+  aliases: FragranceAlias[]
+}
+
+export interface UndoCheckpoint {
+  id: 'latest'
+  mergeEventId: string
+  before: RecoveryState
+  afterFingerprint: string
+  previousHistoryTargets: Array<{ id: string; currentSurvivorId: string }>
+}
+
+export interface BackupV2 extends RecoveryState {
+  schemaVersion: 2
+  exportedAt: string
+  mergeEvents: MergeEvent[]
+}

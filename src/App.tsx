@@ -15,6 +15,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { useCallback, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { DuplicateReviewDialog } from './components/DuplicateReviewDialog'
 import { AddFragranceDialog } from './components/AddFragranceDialog'
 import { CaptureDialog } from './components/CaptureDialog'
 import { DetailsPanel } from './components/DetailsPanel'
@@ -32,6 +33,8 @@ type SourceFilter = 'all' | SimilaritySource
 function App() {
   const { fragrances, captures, observations, loading } = useDatabaseSnapshot()
   const [showAdd, setShowAdd] = useState(false)
+  const [showDuplicates, setShowDuplicates] = useState(false)
+  const [historyEventId, setHistoryEventId] = useState<string>()
   const [captureTarget, setCaptureTarget] = useState<{ id: string; source?: SimilaritySource } | null>(null)
   const [selected, setSelected] = useState<SelectedGraphItem>(null)
   const [showContext, setShowContext] = useState(true)
@@ -182,6 +185,7 @@ function App() {
         </div>
 
         <div className="sidebar-footer">
+          <button className="button button--quiet button--full" type="button" disabled={loading} onClick={() => { setHistoryEventId(undefined); setShowDuplicates(true); setSidebarOpen(false) }}><Search size={15} /> Find duplicates</button>
           <button className="button button--quiet button--full mobile-only" type="button" onClick={exportData}><Download size={15} /> Export backup</button>
           <button className="button button--quiet button--full mobile-only" type="button" onClick={() => importRef.current?.click()}><Upload size={15} /> Restore backup</button>
           <div className="local-note"><Database size={15} /><span>Private & local<br /><small>Stored in this browser</small></span></div>
@@ -250,7 +254,8 @@ function App() {
         <div className="map-disclaimer"><CircleHelp size={14} /> No link means unknown, not unique.</div>
       </main>
 
-      {selected && <DetailsPanel key={`${selected.type}:${selected.id}`} selection={selected} model={graphModel} onClose={() => setSelected(null)} onCapture={openCapture} />}
+      {selected && <DetailsPanel key={`${selected.type}:${selected.id}`} selection={selected} model={graphModel} onClose={() => setSelected(null)} onCapture={openCapture} onHistory={(id) => { setHistoryEventId(id); setShowDuplicates(true) }} />}
+      {showDuplicates && <DuplicateReviewDialog initialEventId={historyEventId} onSelectFragrance={(id) => { setShowDuplicates(false); setSelected({ type: 'node', id }); setShowContext(true); setClusterFocus('all') }} fragrances={fragrances} captures={captures} observations={observations} onClose={() => setShowDuplicates(false)} onMerged={() => { setSelected(null); setClusterFocus('all') }} />}
       {showAdd && <AddFragranceDialog onClose={() => setShowAdd(false)} onSaved={(id) => setSelected({ type: 'node', id })} />}
       {selectedTarget && (
         <CaptureDialog
@@ -280,6 +285,7 @@ function App() {
               <Info size={20} />
               <p>This valid backup will replace everything currently stored in this browser.</p>
               <div><span><b>{backupPreview.ownedCount}</b> owned</span><span><b>{backupPreview.fragranceCount}</b> total nodes</span><span><b>{backupPreview.captureCount}</b> captures</span><span><b>{backupPreview.observationCount}</b> observations</span></div>
+              <p>{backupPreview.dismissalCount} kept-separate decisions &middot; {backupPreview.mergeCount} merge events &middot; {backupPreview.aliasCount} recognized names. Restoring clears the local undo checkpoint.</p>
               <small>Exported {new Date(backupPreview.backup.exportedAt).toLocaleString()}</small>
             </div>
           ) : <p className="form-error">{backupError}</p>}

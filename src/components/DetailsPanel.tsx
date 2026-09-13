@@ -1,3 +1,5 @@
+import { useDuplicateReviewState } from '../data/useDuplicateReviewState'
+import { forgetAlias } from '../data/duplicateDecisions'
 import { useState } from 'react'
 import { Trash2, ArrowRight, ExternalLink, Link2, Network, Plus, X } from 'lucide-react'
 import { displayName } from '../domain/identity'
@@ -11,9 +13,13 @@ interface DetailsPanelProps {
   model: GraphModel
   onClose: () => void
   onCapture: (fragranceId: string, source?: SimilaritySource) => void
+  onHistory: (eventId: string) => void
 }
 
-export function DetailsPanel({ selection, model, onClose, onCapture }: DetailsPanelProps) {
+export function DetailsPanel({ selection, model, onClose, onCapture, onHistory }: DetailsPanelProps) {
+  const reviewState = useDuplicateReviewState()
+  const [aliasError, setAliasError] = useState('')
+  const [aliasBusy, setAliasBusy] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const fragranceById = new Map(model.nodes.map((node) => [node.id, node]))
@@ -104,6 +110,22 @@ export function DetailsPanel({ selection, model, onClose, onCapture }: DetailsPa
         Similarity group {String(fragrance.cluster + 1).padStart(2, '0')}
       </div>
 
+      {reviewState.mergeEvents.some((event) => !event.undoneAt && event.currentSurvivorId === fragrance.id) && <section className="detail-section">
+        <h3>Previously merged names</h3>
+        {reviewState.mergeEvents.filter((event) => !event.undoneAt && event.currentSurvivorId === fragrance.id).map((event) => {
+          const aliases = reviewState.aliases.filter((alias) => alias.mergeEventId === event.id && alias.fragranceId === fragrance.id)
+          return <div className="duplicate-card" key={event.id}><strong>{displayName(event.removed)}</strong>
+            <button type="button" className="button button--quiet" onClick={() => onHistory(event.id)}>View merge history</button>
+            {aliases.map((alias) => <button key={alias.id} type="button" className="button button--quiet" disabled={aliasBusy} onClick={async () => {
+              setAliasBusy(true); setAliasError('')
+              try { await forgetAlias(alias.id) } catch (error) { setAliasError(error instanceof Error ? error.message : 'Could not remove this recognized name.') }
+              finally { setAliasBusy(false) }
+            }}>Stop recognizing this name</button>)}
+            {!aliases.length && <small>This previous name is no longer recognized automatically.</small>}
+          </div>
+        })}
+        {aliasError && <p role="alert" className="form-error">{aliasError}</p>}
+      </section>}
       <div className="details-actions">
         <button className="button button--primary button--full" type="button" onClick={() => onCapture(fragrance.id)} disabled={!fragrance.owned || deleting}>
           <Plus size={15} /> Capture relationships

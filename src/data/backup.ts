@@ -1,12 +1,17 @@
 import { db, type ScentMapDatabase } from './db'
-import type { BackupV1, Fragrance, SimilarityObservation, SourceCapture } from '../domain/types'
+import { dismissalKey, readRecoveryState, writeRecoveryState } from './duplicateDecisions'
+import { identityKey } from '../domain/identity'
+import type { BackupV1, BackupV2, DuplicateDismissal, FragranceAlias, MergeEvent, Fragrance, SimilarityObservation, SourceCapture } from '../domain/types'
 
 export interface BackupPreview {
-  backup: BackupV1
+  backup: BackupV2
   fragranceCount: number
   ownedCount: number
   captureCount: number
   observationCount: number
+  dismissalCount: number
+  aliasCount: number
+  mergeCount: number
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -62,24 +67,37 @@ function isObservation(value: unknown): value is SimilarityObservation {
   )
 }
 
-export async function createBackup(database: ScentMapDatabase = db): Promise<BackupV1> {
-  const [fragrances, captures, observations] = await Promise.all([
-    database.fragrances.toArray(),
-    database.captures.toArray(),
-    database.observations.toArray(),
-  ])
-  return {
-    schemaVersion: 1,
-    exportedAt: new Date().toISOString(),
-    fragrances,
-    captures,
-    observations,
-  }
+function isDismissal(value: unknown): value is DuplicateDismissal {
+  return isRecord(value) && isString(value.id) && isString(value.leftId) && isString(value.rightId) &&
+    isFragrance(value.left) && isFragrance(value.right) && isString(value.dismissedAt) &&
+    value.left.id === value.leftId && value.right.id === value.rightId && value.leftId !== value.rightId &&
+    value.id === dismissalKey(value.leftId, value.rightId)
+}
+
+function isAlias(value: unknown): value is FragranceAlias {
+  return isRecord(value) && isString(value.id) && isString(value.fragranceId) && isString(value.mergeEventId) &&
+    isRecord(value.identity) && isString(value.identity.brand) && isString(value.identity.name) && isOptionalString(value.identity.variant) &&
+    value.id === identityKey({ brand: value.identity.brand, name: value.identity.name, variant: value.identity.variant })
+}
+
+function isMergeEvent(value: unknown): value is MergeEvent {
+  return isRecord(value) && isString(value.id) && isString(value.mergedAt) && isOptionalString(value.undoneAt) &&
+    isFragrance(value.kept) && isFragrance(value.removed) && isFragrance(value.result) && isString(value.currentSurvivorId) &&
+    value.kept.id !== value.removed.id && value.result.id === value.kept.id &&
+    Number.isInteger(value.captureCount) && Number(value.captureCount) >= 0 &&
+    Number.isInteger(value.observationCount) && Number(value.observationCount) >= 0
+}
+
+export async function createBackup(database: ScentMapDatabase = db): Promise<BackupV2> {
+  return database.transaction('r', database.allTables, async () => ({
+    schemaVersion: 2, exportedAt: new Date().toISOString(), ...await readRecoveryState(database),
+    mergeEvents: await database.mergeEvents.toArray(),
+  }))
 }
 
 export function validateBackup(value: unknown): BackupPreview {
-  if (!isRecord(value) || value.schemaVersion !== 1) {
-    throw new Error('This is not a supported Scent Map backup (schema version 1 required).')
+  if (!isRecord(value) || (value.schemaVersion !== 1 && value.schemaVersion !== 2)) {
+    throw new Error('This is not a supported Scent Map backup (schema version 1 or 2 required).')
   }
   if (
     !Array.isArray(value.fragrances) ||
@@ -93,7 +111,14 @@ export function validateBackup(value: unknown): BackupPreview {
     throw new Error('The backup is incomplete or contains invalid records.')
   }
 
-  const backup = value as unknown as BackupV1
+  if (value.schemaVersion === 2 && (
+    !Array.isArray(value.dismissals) || !value.dismissals.every(isDismissal) ||
+    !Array.isArray(value.aliases) || !value.aliases.every(isAlias) ||
+    !Array.isArray(value.mergeEvents) || !value.mergeEvents.every(isMergeEvent)
+  )) throw new Error('The backup contains invalid duplicate review metadata.')
+  const backup: BackupV2 = value.schemaVersion === 1
+    ? { ...(value as unknown as BackupV1), schemaVersion: 2, dismissals: [], aliases: [], mergeEvents: [] }
+    : value as unknown as BackupV2
   const fragranceIds = new Set(backup.fragrances.map((item) => item.id))
   const captureIds = new Set(backup.captures.map((item) => item.id))
   const capturesById = new Map(backup.captures.map((item) => [item.id, item]))
@@ -116,32 +141,30 @@ export function validateBackup(value: unknown): BackupPreview {
     throw new Error('The backup contains broken fragrance or capture references.')
   }
 
+  const eventIds = new Set(backup.mergeEvents.map((item) => item.id))
+  if (eventIds.size !== backup.mergeEvents.length ||
+    new Set(backup.dismissals.map((item) => item.id)).size !== backup.dismissals.length ||
+    new Set(backup.aliases.map((item) => item.id)).size !== backup.aliases.length ||
+    backup.dismissals.some((item) => !fragranceIds.has(item.leftId) || !fragranceIds.has(item.rightId)) ||
+    backup.aliases.some((item) => !fragranceIds.has(item.fragranceId) || !eventIds.has(item.mergeEventId) || backup.mergeEvents.find((event) => event.id === item.mergeEventId)?.undoneAt)
+  ) throw new Error('The backup contains broken duplicate review references.')
+
   return {
     backup,
     fragranceCount: backup.fragrances.length,
     ownedCount: backup.fragrances.filter((item) => item.owned).length,
     captureCount: backup.captures.length,
     observationCount: backup.observations.length,
+    dismissalCount: backup.dismissals.length, aliasCount: backup.aliases.length, mergeCount: backup.mergeEvents.length,
   }
 }
 
-export async function restoreBackup(
-  backup: BackupV1,
-  database: ScentMapDatabase = db,
-): Promise<void> {
-  validateBackup(backup)
-  await database.transaction(
-    'rw',
-    database.fragrances,
-    database.captures,
-    database.observations,
-    async () => {
-      await database.observations.clear()
-      await database.captures.clear()
-      await database.fragrances.clear()
-      await database.fragrances.bulkAdd(backup.fragrances)
-      await database.captures.bulkAdd(backup.captures)
-      await database.observations.bulkAdd(backup.observations)
-    },
-  )
+export async function restoreBackup(backup: BackupV1 | BackupV2, database: ScentMapDatabase = db): Promise<void> {
+  const validated = validateBackup(backup).backup
+  await database.transaction('rw', database.allTables, async () => {
+    await writeRecoveryState(validated, database)
+    await database.mergeEvents.clear()
+    await database.mergeEvents.bulkAdd(validated.mergeEvents)
+    await database.undoCheckpoints.clear()
+  })
 }

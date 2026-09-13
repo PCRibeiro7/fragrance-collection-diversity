@@ -1,9 +1,12 @@
+import { useDuplicateReviewState } from '../data/useDuplicateReviewState'
+import { useDatabaseSnapshot } from '../data/useDatabaseSnapshot'
+import { resolveKnownIdentity } from '../data/duplicateDecisions'
 import { useState, type FormEvent } from 'react'
 import { parseSimilarityList, type ParsedSimilarityLine } from '../domain/parser'
 import type { SimilaritySource } from '../domain/types'
 import { Modal } from './Modal'
 import { saveFragranceWithRelationships } from '../data/repository'
-import { validateHttpUrl } from '../domain/identity'
+import { displayName, validateHttpUrl } from '../domain/identity'
 
 interface AddFragranceDialogProps {
   onClose: () => void
@@ -11,6 +14,8 @@ interface AddFragranceDialogProps {
 }
 
 export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps) {
+  const reviewState = useDuplicateReviewState()
+  const snapshot = useDatabaseSnapshot()
   const [brand, setBrand] = useState('')
   const [name, setName] = useState('')
   const [variant, setVariant] = useState('')
@@ -21,6 +26,8 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
   })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const resolved = resolveKnownIdentity({ brand, name, variant }, snapshot.fragrances, reviewState.aliases)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -73,13 +80,14 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
           <button className="button button--quiet" type="button" onClick={onClose}>
             Cancel
           </button>
-          <button className="button button--primary" type="submit" form="add-fragrance" disabled={saving}>
+          <button className="button button--primary" type="submit" form="add-fragrance" disabled={saving || reviewState.loading || snapshot.loading || Boolean(reviewState.error)}>
             {saving ? 'Saving…' : 'Save fragrance and relationships'}
           </button>
         </>
       }
     >
       <form id="add-fragrance" className="form-stack" onSubmit={handleSubmit}>
+        {resolved && <p role="status">Will reuse {displayName(resolved)}. Its existing name and source links are retained when matching a previously merged name.</p>}
         <div className="field-row">
           <label className="field">
             <span>Brand</span>
@@ -139,12 +147,13 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
                       } }))} />
                   </label>
                 ))}
+                {resolveKnownIdentity(row, snapshot.fragrances, reviewState.aliases) && <small>Will reuse {displayName(resolveKnownIdentity(row, snapshot.fragrances, reviewState.aliases)!)}</small>}
               </div>
             ))}
           </div>
         ))}
         <p className="review-help">Exact brand, name, and variant matches reuse existing fragrances. Adding a list for an existing fragrance replaces that source's saved relationships.</p>
-        {error && <p className="form-error">{error}</p>}
+        {(error || reviewState.error) && <p className="form-error">{error || reviewState.error}</p>}
       </form>
     </Modal>
   )

@@ -1,3 +1,4 @@
+import { cleanupReviewReferences } from './duplicateDecisions'
 import { db, type ScentMapDatabase } from './db'
 import { fragranceIdentityKey, identityKey, normalizeFragranceInput } from '../domain/identity'
 import type {
@@ -30,45 +31,57 @@ export async function upsertFragrance(
   input: FragranceInput,
   database: ScentMapDatabase = db,
 ): Promise<Fragrance> {
-  const clean = cleanInput(input)
-  const normalized = normalizeFragranceInput(clean)
-  const existing = await database.fragrances
-    .where('[normalizedBrand+normalizedName+normalizedVariant]')
-    .equals([normalized.normalizedBrand, normalized.normalizedName, normalized.normalizedVariant])
-    .first()
-  const now = new Date().toISOString()
+  return database.transaction('rw', database.fragrances, database.aliases, async () => {
+    const clean = cleanInput(input)
+    const normalized = normalizeFragranceInput(clean)
+    const existing = await database.fragrances
+      .where('[normalizedBrand+normalizedName+normalizedVariant]')
+      .equals([normalized.normalizedBrand, normalized.normalizedName, normalized.normalizedVariant])
+      .first()
+    const now = new Date().toISOString()
 
-  if (existing) {
-    const updated: Fragrance = {
-      ...existing,
+    const alias = existing ? undefined : await database.aliases.get(identityKey(clean))
+    const aliasTarget = alias ? await database.fragrances.get(alias.fragranceId) : undefined
+    if (aliasTarget) {
+      const updated = { ...aliasTarget, owned: Boolean(aliasTarget.owned || clean.owned),
+        sourceUrls: { fragrantica: aliasTarget.sourceUrls.fragrantica || clean.sourceUrls?.fragrantica,
+          parfumo: aliasTarget.sourceUrls.parfumo || clean.sourceUrls?.parfumo }, updatedAt: now }
+      await database.fragrances.put(updated)
+      return updated
+    }
+
+    if (existing) {
+      const updated: Fragrance = {
+        ...existing,
+        brand: clean.brand,
+        name: clean.name,
+        variant: clean.variant,
+        owned: Boolean(existing.owned || clean.owned),
+        sourceUrls: {
+          fragrantica: clean.sourceUrls?.fragrantica || existing.sourceUrls.fragrantica,
+          parfumo: clean.sourceUrls?.parfumo || existing.sourceUrls.parfumo,
+        },
+        ...normalized,
+        updatedAt: now,
+      }
+      await database.fragrances.put(updated)
+      return updated
+    }
+
+    const fragrance: Fragrance = {
+      id: uuid(),
       brand: clean.brand,
       name: clean.name,
       variant: clean.variant,
-      owned: Boolean(existing.owned || clean.owned),
-      sourceUrls: {
-        fragrantica: clean.sourceUrls?.fragrantica || existing.sourceUrls.fragrantica,
-        parfumo: clean.sourceUrls?.parfumo || existing.sourceUrls.parfumo,
-      },
+      owned: clean.owned ?? false,
+      sourceUrls: clean.sourceUrls ?? {},
       ...normalized,
+      createdAt: now,
       updatedAt: now,
     }
-    await database.fragrances.put(updated)
-    return updated
-  }
-
-  const fragrance: Fragrance = {
-    id: uuid(),
-    brand: clean.brand,
-    name: clean.name,
-    variant: clean.variant,
-    owned: clean.owned ?? false,
-    sourceUrls: clean.sourceUrls ?? {},
-    ...normalized,
-    createdAt: now,
-    updatedAt: now,
-  }
-  await database.fragrances.add(fragrance)
-  return fragrance
+    await database.fragrances.add(fragrance)
+    return fragrance
+  })
 }
 
 async function resolveTarget(
@@ -96,9 +109,7 @@ export async function replaceCapture(
 ): Promise<{ capture: SourceCapture; observations: SimilarityObservation[] }> {
   return database.transaction(
     'rw',
-    database.fragrances,
-    database.captures,
-    database.observations,
+    database.collectionTables,
     async () => {
       const root = await database.fragrances.get(input.rootFragranceId)
       if (!root) throw new Error('The collection fragrance no longer exists.')
@@ -118,17 +129,20 @@ export async function replaceCapture(
       const previous = await database.captures
         .where('[rootFragranceId+source]')
         .equals([input.rootFragranceId, input.source])
-        .first()
+        .toArray()
       const capture: SourceCapture = {
-        id: previous?.id ?? uuid(),
+        id: previous[0]?.id ?? uuid(),
         rootFragranceId: input.rootFragranceId,
         source: input.source,
         pageUrl: input.pageUrl?.trim() || undefined,
         capturedAt: new Date().toISOString(),
       }
 
+      for (const item of previous) {
+        await database.observations.where('captureId').equals(item.id).delete()
+        await database.captures.delete(item.id)
+      }
       await database.captures.put(capture)
-      if (previous) await database.observations.where('captureId').equals(previous.id).delete()
 
       const observations = [...targetById.values()].map<SimilarityObservation>((target) => ({
         id: uuid(),
@@ -158,6 +172,7 @@ export async function replaceCapture(
         .map((item) => item.id)
       if (orphanIds.length) await database.fragrances.bulkDelete(orphanIds)
 
+      await cleanupReviewReferences(database)
       return { capture, observations }
     },
   )
@@ -179,7 +194,7 @@ export async function saveFragranceWithRelationships(
   lists: Omit<ReplaceCaptureInput, 'rootFragranceId'>[],
   database: ScentMapDatabase = db,
 ): Promise<Fragrance> {
-  return database.transaction('rw', database.fragrances, database.captures, database.observations, async () => {
+  return database.transaction('rw', database.collectionTables, async () => {
     const fragrance = await upsertFragrance(input, database)
     for (const list of lists) {
       await replaceCapture({ ...list, rootFragranceId: fragrance.id }, database)
@@ -192,7 +207,7 @@ export async function deleteFragrance(
   fragranceId: string,
   database: ScentMapDatabase = db,
 ): Promise<void> {
-  await database.transaction('rw', database.fragrances, database.captures, database.observations, async () => {
+  await database.transaction('rw', database.collectionTables, async () => {
     const fragrance = await database.fragrances.get(fragranceId)
     if (!fragrance) return
     const relatedIds = new Set<string>()
@@ -225,5 +240,6 @@ export async function deleteFragrance(
       )
       await database.fragrances.bulkDelete(orphanIds)
     }
+    await cleanupReviewReferences(database)
   })
 }
