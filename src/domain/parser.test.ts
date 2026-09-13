@@ -117,6 +117,77 @@ describe('similarity list parser', () => {
     )
   })
 
+  it('applies a trailing concentration to each alias in a Parfumo card', () => {
+    const text = [
+      'Tuscany per Uomo / Etruscan (Eau de Toilette) by Aramis',
+      'Tuscany per Uomo\u00a0Eau de Toilette',
+      'Stand In by Omerta',
+      'Stand In',
+      'Tuscany per Uomo / Etruscan (Eau de Toilette) by Aramis',
+      'Etruscan Eau de Toilette',
+    ].join('\n')
+    expect(parseSimilarityList(text).map(({ brand, name }) => ({ brand, name }))).toEqual([
+      { brand: 'Aramis', name: 'Tuscany per Uomo\u00a0Eau de Toilette' },
+      { brand: 'Omerta', name: 'Stand In' },
+      { brand: 'Aramis', name: 'Etruscan Eau de Toilette' },
+    ])
+  })
+
+  it('keeps the 30 Azzaro related names in order without adding a Tuscany title row', () => {
+    const names = [
+      'Azzaro pour Homme\u00a0After Shave Lotion',
+      'Azzaro pour Homme\u00a0Eau de Toilette Intense',
+      "Azzaro pour Homme L'Eau",
+      'Azzaro pour Homme Summer 2015',
+      'Tuscany per Uomo\u00a0Eau de Toilette',
+      'Stand In',
+      'Azzaro pour Homme Summer 2014',
+      'Paco Rabanne pour Homme\u00a0Eau de Toilette',
+      'Azzaro pour Homme Intense',
+      'Sandalo\u00a0Eau de Parfum',
+      'Aramis\u00a0Eau de Toilette',
+      'Marbert Man Classic\u00a0Eau de Toilette',
+      'Un Homme\u00a0Eau de Toilette',
+      'Le Tour de France',
+      'Moschino pour Homme\u00a0Eau de Toilette',
+      'Masculin Acier\u00a0Eau de Toilette',
+      'Azzaro pour Homme Edition Noire',
+      'Absinth\u00a0Extrait de Parfum',
+      'Red for Men\u00a0Eau de Toilette',
+      "L'Immensit\u00e9",
+      'Pure Cedrat',
+      'Raysuli',
+      'Brut 33\u00a0Cologne',
+      'Cuba Black\u00a0Eau de Toilette',
+      'Lagerfeld Classic\u00a0Eau de Toilette',
+      'Rive Gauche pour Homme (2003)\u00a0Eau de Toilette',
+      'Polo\u00a0Eau de Toilette',
+      'No. 7',
+      'Attimo',
+      'Mezzo',
+    ]
+    expect(parseSimilarityList(names.join('\n')).map(({ name }) => name)).toEqual(names)
+    const clipboard = [...names]
+    clipboard.splice(4, 0, 'Tuscany per Uomo / Etruscan (Eau de Toilette) by Aramis')
+    const rows = parseSimilarityList(clipboard.join('\r\n'))
+    expect(rows.map(({ name }) => name)).toEqual(names)
+    expect(rows[4].brand).toBe('Aramis')
+  })
+
+  it('does not consume a different concentration or an unrelated following name', () => {
+    expect(parseSimilarityList([
+      'Tuscany per Uomo / Etruscan (Eau de Toilette) by Aramis',
+      'Tuscany per Uomo Eau de Parfum',
+      'Somebody by Night',
+      'Other fragrance',
+    ].join('\n'))).toMatchObject([
+      { brand: '', name: 'Tuscany per Uomo / Etruscan (Eau de Toilette) by Aramis' },
+      { brand: '', name: 'Tuscany per Uomo Eau de Parfum' },
+      { brand: '', name: 'Somebody by Night' },
+      { brand: '', name: 'Other fragrance' },
+    ])
+  })
+
   it('deduplicates Parfumo cards with manual entries and preserves unrelated rows', () => {
     expect(parseSimilarityList('Pure Vision by Caline\nPure Vision\nCaline | Pure Vision\nOther fragrance'))
       .toMatchObject([{ brand: 'Caline', name: 'Pure Vision' }, { brand: '', name: 'Other fragrance' }])

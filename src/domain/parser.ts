@@ -33,8 +33,16 @@ export function parseSimilarityList(text: string): ParsedSimilarityLine[] {
     const parfumoBrand = raw.slice(byIndex + 4).trim()
     const displayName = lines[index + 1]
     const normalizeTitle = (value: string) => value.replace(/[()]/g, '').replace(/\s+/g, ' ').trim().toLocaleLowerCase()
+    const aliases = title.split(/\s+\/\s+/)
+    // A trailing qualifier can apply to every alias, e.g.
+    // "Tuscany per Uomo / Etruscan (Eau de Toilette)".
+    const sharedQualifier = title.match(/\s+(\([^()]+\))$/)?.[1]
+    const titleNames = [title, ...aliases]
+    if (aliases.length > 1 && sharedQualifier) {
+      titleNames.push(...aliases.slice(0, -1).map((name) => `${name} ${sharedQualifier}`))
+    }
     const parfumoCard = !raw.includes('|') && byIndex > 0 && parfumoBrand && displayName &&
-      [title, ...title.split(/\s+\/\s+/)].some((name) => normalizeTitle(name) === normalizeTitle(displayName))
+      titleNames.some((name) => normalizeTitle(name) === normalizeTitle(displayName))
     if (parfumoCard) {
       raw = `${parfumoBrand} | ${displayName}`
       index += 1
