@@ -1,6 +1,6 @@
 import { useDuplicateReviewState } from '../data/useDuplicateReviewState'
 import { resolveKnownIdentity } from '../data/duplicateDecisions'
-import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Sparkles, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { replaceCapture } from '../data/repository'
 import { displayName, identityKey, validateHttpUrl } from '../domain/identity'
@@ -131,6 +131,12 @@ export function CaptureDialog({
     )
   }
 
+  function removeRow(id: string) {
+    if (saving) return
+    setRows((current) => current?.filter((row) => row.id !== id) ?? null)
+    setError('')
+  }
+
   const proposedKeys = new Set(
     (rows ?? []).map((row) => {
       const selectedExisting = row.existingId ? fragranceById.get(row.existingId) : undefined
@@ -158,7 +164,7 @@ export function CaptureDialog({
     .filter((item): item is Fragrance => Boolean(item))
 
   async function save() {
-    if (!rows) return
+    if (!rows?.length || saving) return
     if (rows.some((row) => !row.brand.trim() || !row.name.trim())) {
       setError('Complete the brand and fragrance name on every row.')
       return
@@ -190,7 +196,7 @@ export function CaptureDialog({
       <button className="button button--quiet" type="button" onClick={() => setRows(null)}>
         <ArrowLeft size={16} /> Back
       </button>
-      <button className="button button--primary" type="button" disabled={saving} onClick={save}>
+      <button className="button button--primary" type="button" disabled={saving || rows.length === 0} onClick={save}>
         <Check size={16} /> {saving ? 'Saving…' : 'Replace source list'}
       </button>
     </>
@@ -278,7 +284,7 @@ export function CaptureDialog({
           )}
           <div className="review-table" role="table" aria-label="Parsed fragrance identities">
             <div className="review-table__header" role="row">
-              <span>Brand</span><span>Fragrance</span><span>Variant</span><span>Identity decision</span>
+              <span>Brand</span><span>Fragrance</span><span>Variant</span><span>Identity decision</span><span aria-label="Actions" />
             </div>
             {rows.map((row) => (
               <div className="review-row" role="row" key={row.id}>
@@ -314,9 +320,22 @@ export function CaptureDialog({
                     <option key={item.id} value={item.id}>Possible · {displayName(item)}</option>
                   ))}
                 </select>
+                <button
+                  className="review-row__remove"
+                  type="button"
+                  aria-label={`Remove row for ${row.raw}`}
+                  title="Remove row"
+                  disabled={saving}
+                  onClick={() => removeRow(row.id)}
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
               </div>
             ))}
           </div>
+          {rows.length === 0 && (
+            <p className="review-help" role="status">No fragrances left to review. Go back to edit the pasted list.</p>
+          )}
           <p className="review-help">Possible matches are never selected automatically. Recognized matches use an exact current or previously merged brand, name, and variant. To reuse a previous name for a separate fragrance, stop recognizing it in fragrance details first.</p>
         </div>
       )}
