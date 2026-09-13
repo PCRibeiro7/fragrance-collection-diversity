@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 80" fill="none">
+  <title>Scent Map - collection diversity</title>
+  <svg x="8" y="8" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="16" fill="#304b43"/>
+  <path d="M43 19C37 12 22 14 21 23C19 33 45 30 43 41C42 50 27 52 20 45" stroke="#faf8f3" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="43" cy="19" r="3.5" fill="#d4ad80"/>
+  </svg>
+  <text x="88" y="43" fill="#25211c" font-family="Georgia, 'Times New Roman', serif" font-size="34" letter-spacing="-1.1">Scent Map</text>
+  <text x="90" y="61" fill="#746c62" font-family="Arial, sans-serif" font-size="8" letter-spacing="2.5">COLLECTION DIVERSITY</text>
+</svg>

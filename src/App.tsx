@@ -8,7 +8,6 @@ import {
   Focus,
   Info,
   LibraryBig,
-  Map,
   Menu,
   Plus,
   Search,
@@ -129,7 +128,7 @@ function App() {
           <button className="icon-button mobile-menu" type="button" onClick={() => setSidebarOpen(true)} aria-label="Open collection">
             <Menu size={20} />
           </button>
-          <div className="brand-mark"><Map size={21} /></div>
+          <img className="brand-mark" src={`${import.meta.env.BASE_URL}brand/scent-map-mark.svg`} width="38" height="38" alt="" />
           <div><strong>Scent Map</strong><span>collection diversity</span></div>
         </div>
         <div className="topbar__actions">
@@ -243,7 +242,7 @@ function App() {
 
         {!loading && !fragrances.length && (
           <section className="empty-state">
-            <div className="empty-orbit"><span /><span /><span /><Map size={34} /></div>
+            <img className="empty-brand-mark" src={`${import.meta.env.BASE_URL}brand/scent-map-mark.svg`} width="96" height="96" alt="" />
             <p className="eyebrow">A clearer collection starts here</p>
             <h2>Map what your nose already knows.</h2>
             <p>Add an owned fragrance and its community similarity lists together. Relationships become a map—not a verdict.</p>
