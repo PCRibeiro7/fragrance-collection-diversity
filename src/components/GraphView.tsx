@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { displayName } from '../domain/identity'
 import { CLUSTER_COLORS } from '../domain/colors'
 import { edgeDirections, visibleGraphElements } from '../domain/graph'
+import { graphLayout, groupedPositions } from '../domain/graphLayout'
+import type { NodePosition } from '../domain/computeGraphPositions'
 import type { GraphModel, SelectedGraphItem } from '../domain/types'
 
 interface GraphViewProps {
@@ -34,6 +36,10 @@ export function GraphView({
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
   const [tooltip, setTooltip] = useState<EdgeTooltip | null>(null)
+  const layoutCache = useMemo(() => {
+    // A new model invalidates positions after data or source changes.
+    return { model, views: new Map<string, NodePosition[]>() }
+  }, [model])
   const fragranceById = useMemo(
     () => new Map(model.nodes.map((node) => [node.id, node])),
     [model.nodes],
@@ -46,27 +52,17 @@ export function GraphView({
       showContext,
       clusterFocus,
     )
-    const clusterOrder = [...new Set(visibleNodes.map((node) => node.cluster))]
-    const positions = new Map<string, { x: number; y: number }>()
-
-    for (const [clusterIndex, cluster] of clusterOrder.entries()) {
-      const members = visibleNodes.filter((node) => node.cluster === cluster)
-      const column = clusterIndex % 3
-      const row = Math.floor(clusterIndex / 3)
-      const centerX = column * 340
-      const centerY = row * 300
-      members.forEach((node, index) => {
-        const angle = (index / Math.max(members.length, 1)) * Math.PI * 2
-        const radius = Math.max(55, Math.min(130, members.length * 13))
-        positions.set(node.id, {
-          x: centerX + Math.cos(angle) * radius,
-          y: centerY + Math.sin(angle) * radius,
-        })
-      })
-    }
+    const positions = groupedPositions(visibleNodes)
+    const viewKey = `${showContext}:${clusterFocus}`
+    const cachedPositions = layoutCache.views.get(viewKey)
+    for (const node of cachedPositions ?? []) positions.set(node.id, node.position)
+    const layout = graphLayout(visibleNodes.length, visibleEdges.length)
 
     const cy = cytoscape({
       container: containerRef.current,
+      layout,
+      pixelRatio: 1,
+      hideEdgesOnViewport: visibleNodes.length > 150,
       elements: [
         ...visibleNodes.map((node) => ({
           group: 'nodes' as const,
@@ -109,6 +105,7 @@ export function GraphView({
             color: '#29251f',
             'font-family': 'Manrope, sans-serif',
             'font-size': 10,
+            'min-zoomed-font-size': 7,
             'font-weight': 600,
             'text-wrap': 'ellipsis',
             'text-max-width': '104px',
@@ -143,6 +140,7 @@ export function GraphView({
             opacity: 0.62,
             label: 'data(weightLabel)',
             'font-size': 9,
+            'min-zoomed-font-size': 7,
             color: '#6e6458',
             'text-background-color': '#f8f5ee',
             'text-background-opacity': 1,
@@ -178,22 +176,10 @@ export function GraphView({
           style: { 'border-color': '#111', 'border-width': 6, opacity: 1 },
         },
       ],
-      minZoom: 0.25,
+      minZoom: 0.01,
       maxZoom: 2.5,
       wheelSensitivity: 3,
     })
-
-    cy.layout({
-      name: 'cose',
-      randomize: false,
-      animate: false,
-      nodeRepulsion: () => 6200,
-      idealEdgeLength: (edge) => 120 - edge.data('weight') * 13,
-      edgeElasticity: (edge) => 70 + edge.data('weight') * 20,
-      gravity: 0.25,
-      numIter: 650,
-      padding: 54,
-    }).run()
 
     const selectHandler = (event: EventObject) => {
       const target = event.target
@@ -227,11 +213,42 @@ export function GraphView({
     cy.fit(undefined, 56)
     cyRef.current = cy
 
+    let worker: Worker | undefined
+    if (layout.name === 'preset' && !cachedPositions && typeof Worker !== 'undefined') {
+      try {
+        worker = new Worker(new URL('../domain/graphLayout.worker.ts', import.meta.url), { type: 'module' })
+        worker.onmessage = (event: MessageEvent<NodePosition[]>) => {
+          if (cy.destroyed()) return
+          // Keep a few recently visited views so switching back is immediate.
+          if (layoutCache.views.size >= 6) {
+            layoutCache.views.delete(layoutCache.views.keys().next().value!)
+          }
+          layoutCache.views.set(viewKey, event.data)
+          cy.batch(() => {
+            for (const node of event.data) {
+              cy.getElementById(node.id).position(node.position)
+            }
+          })
+          cy.stop()
+          const matches = cy.nodes('.search-hit')
+          cy.fit(matches.length ? matches : cy.elements(), matches.length ? 100 : 56)
+          setTooltip(null)
+          worker?.terminate()
+        }
+        worker.onerror = () => worker?.terminate()
+        worker.postMessage(cy.elements().jsons())
+      } catch {
+        // Keep the immediately usable preview if workers are unavailable.
+        worker?.terminate()
+      }
+    }
+
     return () => {
+      worker?.terminate()
       cy.destroy()
       cyRef.current = null
     }
-  }, [clusterFocus, fragranceById, model, onSelect, showContext])
+  }, [clusterFocus, fragranceById, layoutCache, model, onSelect, showContext])
 
   useEffect(() => {
     const cy = cyRef.current
@@ -247,7 +264,7 @@ export function GraphView({
     matches.removeClass('search-muted').addClass('search-hit')
     matches.connectedEdges().removeClass('search-muted')
     if (matches.length) cy.animate({ fit: { eles: matches, padding: 100 }, duration: 250 })
-  }, [fragranceById, search])
+  }, [clusterFocus, fragranceById, model, onSelect, search, showContext])
 
   useEffect(() => {
     const cy = cyRef.current
@@ -259,7 +276,7 @@ export function GraphView({
     if (!cy) return
     cy.elements().unselect()
     if (selected) cy.getElementById(selected.id).select()
-  }, [selected])
+  }, [clusterFocus, fragranceById, model, onSelect, selected, showContext])
 
   return (
     <div className="graph-stage">
