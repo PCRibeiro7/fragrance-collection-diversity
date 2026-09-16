@@ -20,11 +20,14 @@ npm test
 
 ## Workflow
 
-1. Add an owned fragrance with its brand, name, and optional concentration/source links.
-2. Select the fragrance and choose **Capture relationships**.
-3. Pick Fragrantica or Parfumo and paste one related fragrance per line. `Brand | Fragrance` is the preferred format.
-4. Complete missing brands and review identity suggestions. Fuzzy suggestions are never merged automatically.
-5. Replace the saved list and inspect the resulting graph, evidence, shared context, and collection coverage.
+1. Use **Preview a fragrance** to compare a candidate with the collection without saving it. Paste either community similarity list to see direct owned overlaps, shared context, and the closest known profiles.
+2. Add an owned fragrance with its brand, name, and optional concentration/source links.
+3. Select the fragrance and choose **Capture relationships**.
+4. Pick Fragrantica or Parfumo and paste one related fragrance per line. `Brand | Fragrance` is the preferred format.
+5. Complete missing brands and review identity suggestions. Fuzzy suggestions are never merged automatically.
+6. Replace the saved list and inspect the resulting graph, evidence, shared context, and collection coverage.
+
+Preview assessments are intentionally cautious: unmatched names and missing links count as unknown evidence, not proof that a candidate is unique.
 
 Observations remain directed in storage. Each displayed edge points toward the referenced fragrance, with arrowheads at both ends for mutual references. Its weight is from 1–4: one point for each unique source and direction. The number and line thickness indicate evidence count, not direction; arrows reflect the enabled sources. Community detection still treats relationships as undirected. A missing link means insufficient evidence, not uniqueness.
 

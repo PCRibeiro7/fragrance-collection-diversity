@@ -5,6 +5,7 @@ import {
   CircleHelp,
   Database,
   Download,
+  Eye,
   Focus,
   Info,
   LibraryBig,
@@ -20,6 +21,7 @@ import { CaptureDialog } from './components/CaptureDialog'
 import { DetailsPanel } from './components/DetailsPanel'
 import { GraphView } from './components/GraphView'
 import { Modal } from './components/Modal'
+import { PreviewFragranceDialog } from './components/PreviewFragranceDialog'
 import { createBackup, restoreBackup, validateBackup, type BackupPreview } from './data/backup'
 import { useDatabaseSnapshot } from './data/useDatabaseSnapshot'
 import { buildGraphModel, groupOptions } from './domain/graph'
@@ -32,6 +34,7 @@ type SourceFilter = 'all' | SimilaritySource
 function App() {
   const { fragrances, captures, observations, loading } = useDatabaseSnapshot()
   const [showAdd, setShowAdd] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const [showDuplicates, setShowDuplicates] = useState(false)
   const [historyEventId, setHistoryEventId] = useState<string>()
   const [captureTarget, setCaptureTarget] = useState<{ id: string; source?: SimilaritySource } | null>(null)
@@ -138,6 +141,9 @@ function App() {
           <button className="button button--quiet hide-mobile" type="button" onClick={() => importRef.current?.click()}>
             <Upload size={15} /> Restore
           </button>
+          <button className="button button--quiet hide-mobile" type="button" onClick={() => setShowPreview(true)}>
+            <Eye size={15} /> Preview
+          </button>
           <button className="button button--primary" type="button" onClick={() => setShowAdd(true)}>
             <Plus size={16} /> Add fragrance
           </button>
@@ -184,6 +190,7 @@ function App() {
         </div>
 
         <div className="sidebar-footer">
+          <button className="button button--quiet button--full" type="button" disabled={loading} onClick={() => { setShowPreview(true); setSidebarOpen(false) }}><Eye size={15} /> Preview a fragrance</button>
           <button className="button button--quiet button--full" type="button" disabled={loading} onClick={() => { setHistoryEventId(undefined); setShowDuplicates(true); setSidebarOpen(false) }}><Search size={15} /> Find duplicates</button>
           <button className="button button--quiet button--full mobile-only" type="button" onClick={exportData}><Download size={15} /> Export backup</button>
           <button className="button button--quiet button--full mobile-only" type="button" onClick={() => importRef.current?.click()}><Upload size={15} /> Restore backup</button>
@@ -255,6 +262,7 @@ function App() {
 
       {selected && <DetailsPanel key={`${selected.type}:${selected.id}`} selection={selected} model={graphModel} onClose={() => setSelected(null)} onCapture={openCapture} onHistory={(id) => { setHistoryEventId(id); setShowDuplicates(true) }} />}
       {showDuplicates && <DuplicateReviewDialog initialEventId={historyEventId} onSelectFragrance={(id) => { setShowDuplicates(false); setSelected({ type: 'node', id }); setShowContext(true); setClusterFocus('all') }} fragrances={fragrances} captures={captures} observations={observations} onClose={() => setShowDuplicates(false)} onMerged={() => { setSelected(null); setClusterFocus('all') }} />}
+      {showPreview && <PreviewFragranceDialog fragrances={fragrances} observations={observations} onClose={() => setShowPreview(false)} />}
       {showAdd && <AddFragranceDialog onClose={() => setShowAdd(false)} onSaved={(id) => setSelected({ type: 'node', id })} />}
       {selectedTarget && (
         <CaptureDialog
