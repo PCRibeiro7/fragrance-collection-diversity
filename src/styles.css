@@ -254,6 +254,15 @@ button { color: inherit; }
 .field small, .review-help { color: #8c8378; font-size: 9px; line-height: 1.45; }
 .field code { color: var(--accent-dark); background: #efe8df; }
 .source-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+.add-fragrance-form > .field-row, .add-fragrance-form > .field { max-width: 680px; }
+.add-relationship-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.add-relationship-editor { position: relative; min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #f6f2eb; }
+.add-relationship-editor h3 { margin: 0; font: 500 18px/1.2 Georgia, serif; }
+.add-relationship-editor .field textarea { min-height: 190px; background: #fff; }
+.add-parsed-count { position: absolute; top: 19px; right: 18px; margin: 0; color: var(--green); font-size: 9px; font-weight: 800; }
+.add-review-source { min-width: 730px; }
+.add-review-source > h3 { display: flex; align-items: baseline; gap: 8px; margin: 4px 0 8px; font: 500 17px/1.2 Georgia, serif; }
+.add-review-source > h3 span { color: var(--muted); font: 700 8px/1.2 Inter, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
 .form-error { margin: 0; padding: 10px 12px; color: #8f2d25; border: 1px solid #e7c4bf; border-radius: 9px; background: #fff0ee; font-size: 10px; line-height: 1.5; }
 
 .preview-intro { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
@@ -364,6 +373,9 @@ button { color: inherit; }
   .modal { max-height: calc(100vh - 20px); }
   .modal__header, .modal__body, .modal__footer { padding-left: 16px; padding-right: 16px; }
   .field-row, .source-fields { display: flex; flex-direction: column; }
+  .add-relationship-grid { grid-template-columns: 1fr; }
+  .add-relationship-editor { padding: 14px; }
+  .add-parsed-count { top: 15px; right: 14px; }
   .preview-list-grid, .preview-match-list { grid-template-columns: 1fr; }
   .preview-stats { grid-template-columns: 1fr; }
   .review-layout { overflow-x: auto; }

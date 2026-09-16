@@ -26,7 +26,10 @@ describe('previously merged names in the app', () => {
     fireEvent.change(screen.getByPlaceholderText('Philosykos'), { target: { value: 'Old' } })
     expect(await screen.findByRole('status')).toHaveTextContent(/Will reuse Brand.*Canonical/)
     fireEvent.change(screen.getByLabelText(/Fragrantica relationships/), { target: { value: 'Brand | Old' } })
-    expect(await screen.findByText(/^Will reuse Brand.*Canonical$/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Review 1 match/ }))
+    expect(screen.getByRole('heading', { name: 'Review identity matches' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: /Fragrantica identity match/ })).toHaveValue(canonical.id)
+    expect(screen.getByRole('option', { name: /Canonical/ })).toBeInTheDocument()
   })
 
   it('selects an exact previous name as its canonical identity in capture review', async () => {
