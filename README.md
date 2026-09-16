@@ -33,3 +33,14 @@ Observations remain directed in storage. Each displayed edge points toward the r
 The application has no backend and makes no requests to Fragrantica or Parfumo. IndexedDB in the current browser profile is the primary database. Use **Export** regularly to download a versioned JSON backup. Restore validates the entire file and previews record counts before replacing local data.
 
 Deleting browser site data will delete the local collection unless a backup has been exported.
+
+## Deploy to Netlify
+
+The repository includes a `netlify.toml` with the production build and publish settings. In Netlify, import this repository and deploy it with the detected configuration, or use the Netlify CLI:
+
+```bash
+netlify init
+netlify deploy --build --prod
+```
+
+Data is stored in IndexedDB per site origin. Changing the Netlify domain later makes an existing browser collection unavailable at the new address, so export a backup before changing domains.
