@@ -121,6 +121,14 @@ describe('graph derivation', () => {
   it('handles an empty collection', () => {
     expect(buildGraphModel([], [])).toEqual({ nodes: [], edges: [], clusters: [] })
   })
+
+  it('uses community resolution to calibrate broader versus separate groups', () => {
+    const fragrances = [fragrance('a'), fragrance('b')]
+    const observations = [observation('1', 'a', 'b', 'fragrantica')]
+
+    expect(buildGraphModel(fragrances, observations, undefined, 0.4).clusters).toHaveLength(1)
+    expect(buildGraphModel(fragrances, observations, undefined, 2.5).clusters).toHaveLength(2)
+  })
 })
 
 describe('group navigation', () => {

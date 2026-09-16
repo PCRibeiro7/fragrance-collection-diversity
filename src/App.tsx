@@ -1,6 +1,7 @@
 import {
   ArchiveRestore,
   Check,
+  ChevronDown,
   ChevronRight,
   CircleHelp,
   Database,
@@ -12,9 +13,10 @@ import {
   Menu,
   Plus,
   Search,
+  SlidersHorizontal,
   Upload,
 } from 'lucide-react'
-import { useCallback, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { DuplicateReviewDialog } from './components/DuplicateReviewDialog'
 import { AddFragranceDialog } from './components/AddFragranceDialog'
 import { CaptureDialog } from './components/CaptureDialog'
@@ -31,6 +33,25 @@ import type { SelectedGraphItem, SimilaritySource } from './domain/types'
 
 type SourceFilter = 'all' | SimilaritySource
 
+const GROUP_RESOLUTION_KEY = 'scent-map-group-resolution'
+const DEFAULT_GROUP_RESOLUTION = 1
+
+function storedGroupResolution() {
+  try {
+    const value = Number(window.localStorage.getItem(GROUP_RESOLUTION_KEY))
+    return value >= 0.4 && value <= 2.5 ? value : DEFAULT_GROUP_RESOLUTION
+  } catch {
+    return DEFAULT_GROUP_RESOLUTION
+  }
+}
+
+function groupResolutionLabel(value: number) {
+  if (value < 0.8) return 'Broad'
+  if (value < 1.3) return 'Balanced'
+  if (value < 1.9) return 'Detailed'
+  return 'Most separate'
+}
+
 function App() {
   const { fragrances, captures, observations, loading } = useDatabaseSnapshot()
   const [showAdd, setShowAdd] = useState(false)
@@ -41,6 +62,7 @@ function App() {
   const [selected, setSelected] = useState<SelectedGraphItem>(null)
   const [showContext, setShowContext] = useState(true)
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
+  const [groupResolution, setGroupResolution] = useState(storedGroupResolution)
   const [clusterFocus, setClusterFocus] = useState<number | 'all'>('all')
   const [search, setSearch] = useState('')
   const [fitSignal, setFitSignal] = useState(0)
@@ -50,6 +72,7 @@ function App() {
   const [toast, setToast] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
+  const calibrationRef = useRef<HTMLDetailsElement>(null)
 
   const owned = useMemo(
     () => fragrances.filter((item) => item.owned).sort((a, b) => displayName(a).localeCompare(displayName(b))),
@@ -60,8 +83,8 @@ function App() {
     [sourceFilter],
   )
   const graphModel = useMemo(
-    () => buildGraphModel(fragrances, observations, enabledSources),
-    [enabledSources, fragrances, observations],
+    () => buildGraphModel(fragrances, observations, enabledSources, groupResolution),
+    [enabledSources, fragrances, groupResolution, observations],
   )
   const clusterOptions = useMemo(() => groupOptions(graphModel), [graphModel])
   const capturedKeys = useMemo(
@@ -77,6 +100,23 @@ function App() {
   const openCapture = useCallback((id: string, source?: SimilaritySource) => {
     setCaptureTarget({ id, source })
     setSidebarOpen(false)
+  }, [])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GROUP_RESOLUTION_KEY, String(groupResolution))
+    } catch {
+      // Grouping still works when browser preference storage is unavailable.
+    }
+  }, [groupResolution])
+
+  useEffect(() => {
+    function closeCalibration(event: PointerEvent) {
+      const panel = calibrationRef.current
+      if (panel?.open && event.target instanceof Node && !panel.contains(event.target)) panel.open = false
+    }
+    document.addEventListener('pointerdown', closeCalibration)
+    return () => document.removeEventListener('pointerdown', closeCalibration)
   }, [])
 
   function flash(message: string) {
@@ -200,64 +240,110 @@ function App() {
       {sidebarOpen && <button className="mobile-scrim" type="button" aria-label="Close collection" onClick={() => setSidebarOpen(false)} />}
 
       <main className="workspace">
-        <div className="graph-toolbar">
-          <label className="search-box">
-            <Search size={16} />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a fragrance" />
-          </label>
-          <div className="toolbar-group source-filter">
-            {(['all', 'fragrantica', 'parfumo'] as const).map((source) => (
-              <button key={source} type="button" className={sourceFilter === source ? 'active' : ''} onClick={() => setSourceFilter(source)}>
-                {source === 'all' ? 'All evidence' : source === 'fragrantica' ? 'F' : 'P'}
-              </button>
-            ))}
+        <section className="graph-toolbar" aria-label="Map controls">
+          <div className="graph-toolbar__search-row">
+            <label className="search-box">
+              <Search size={16} />
+              <input aria-label="Find a fragrance" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a fragrance in your map…" />
+            </label>
+            <button className="map-fit" type="button" onClick={() => setFitSignal((value) => value + 1)}><Focus size={16} /> Fit map</button>
           </div>
-          <label className="toggle-control">
-            <input type="checkbox" checked={showContext} onChange={(event) => setShowContext(event.target.checked)} />
-            <span /> Context
-          </label>
-          <select
-            className="cluster-select"
-            aria-label="Focus similarity group"
-            title={clusterOptions.find((option) => option.cluster === clusterFocus)?.title}
-            value={clusterFocus}
-            onChange={(event) => setClusterFocus(event.target.value === 'all' ? 'all' : Number(event.target.value))}
-          >
-            <option value="all">All groups</option>
-            {clusterOptions.map(({ cluster, label, title }) => <option key={cluster} value={cluster} title={title}>{label}</option>)}
-          </select>
-          <button className="icon-button" type="button" title="Fit graph" onClick={() => setFitSignal((value) => value + 1)}><Focus size={18} /></button>
-        </div>
-
-        <div className="graph-meta">
-          <div className="legend"><span className="legend-owned" /> Owned <span className="legend-context" /> Context <span aria-hidden="true">&rarr;</span> References <span aria-hidden="true">&harr;</span> Mutual</div>
-          <div className="group-dots">
-            {graphModel.clusters.slice(0, 10).map((cluster) => <span key={cluster} style={{ background: CLUSTER_COLORS[cluster % CLUSTER_COLORS.length] }} title={`Similarity group ${cluster + 1}`} />)}
+          <div className="graph-toolbar__filters">
+            <label className="map-filter">
+              <span>Evidence source</span>
+              <select value={sourceFilter} onChange={(event) => { setSourceFilter(event.target.value as SourceFilter); setClusterFocus('all') }}>
+                <option value="all">All sources</option>
+                <option value="fragrantica">Fragrantica</option>
+                <option value="parfumo">Parfumo</option>
+              </select>
+            </label>
+            <label className="map-filter">
+              <span>Show fragrances</span>
+              <select value={showContext ? 'all' : 'owned'} onChange={(event) => setShowContext(event.target.value === 'all')}>
+                <option value="all">Owned + context</option>
+                <option value="owned">Owned only</option>
+              </select>
+            </label>
+            <label className="map-filter">
+              <span>Focus group</span>
+              <select
+                aria-label="Focus similarity group"
+                title={clusterOptions.find((option) => option.cluster === clusterFocus)?.title}
+                value={clusterFocus}
+                onChange={(event) => setClusterFocus(event.target.value === 'all' ? 'all' : Number(event.target.value))}
+              >
+                <option value="all">All groups</option>
+                {clusterOptions.map(({ cluster, label, title }) => <option key={cluster} value={cluster} title={title}>{label}</option>)}
+              </select>
+            </label>
+            <div className="map-filter">
+              <span id="group-detail-label">Group detail</span>
+              <details ref={calibrationRef} className="group-calibration" onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.currentTarget.open = false
+                  event.currentTarget.querySelector('summary')?.focus()
+                }
+              }}>
+                <summary aria-describedby="group-detail-label">
+                  <SlidersHorizontal size={14} />
+                  <span>{groupResolutionLabel(groupResolution)}</span>
+                  <ChevronDown size={14} />
+                </summary>
+                <div className="group-calibration__panel">
+                  <div className="group-calibration__heading"><strong>Group detail</strong><output aria-live="polite">{graphModel.clusters.length} {graphModel.clusters.length === 1 ? 'group' : 'groups'}</output></div>
+                  <p>Choose how broadly related fragrances are grouped.</p>
+                  <input
+                    type="range"
+                    min="0.4"
+                    max="2.5"
+                    step="0.1"
+                    value={groupResolution}
+                    aria-label="Group detail: broader groups to more separate groups"
+                    aria-valuetext={`${groupResolutionLabel(groupResolution)}, resolution ${groupResolution.toFixed(1)}`}
+                    onChange={(event) => { setGroupResolution(Number(event.target.value)); setClusterFocus('all') }}
+                  />
+                  <div className="group-calibration__scale"><span>Broader</span><span>More separate</span></div>
+                  <div className="group-calibration__footer">
+                    <span>{groupResolutionLabel(groupResolution)} · {groupResolution.toFixed(1)}</span>
+                    <button type="button" disabled={groupResolution === DEFAULT_GROUP_RESOLUTION} onClick={() => { setGroupResolution(DEFAULT_GROUP_RESOLUTION); setClusterFocus('all') }}>Reset to default</button>
+                  </div>
+                </div>
+              </details>
+            </div>
           </div>
-          <span>{graphModel.nodes.length} fragrances · {graphModel.edges.length} recorded links</span>
+        </section>
+
+        <div className="map-viewport">
+          <div className="graph-meta">
+            <div className="legend"><span className="legend-owned" /> Owned <span className="legend-context" /> Context <span aria-hidden="true">&rarr;</span> References <span aria-hidden="true">&harr;</span> Mutual</div>
+            <div className="group-dots">
+              {graphModel.clusters.slice(0, 10).map((cluster) => <span key={cluster} style={{ background: CLUSTER_COLORS[cluster % CLUSTER_COLORS.length] }} title={`Similarity group ${cluster + 1}`} />)}
+            </div>
+            <span>{graphModel.nodes.length} fragrances · {graphModel.edges.length} recorded links</span>
+          </div>
+
+          <GraphView
+            model={graphModel}
+            showContext={showContext}
+            clusterFocus={clusterFocus}
+            search={search}
+            fitSignal={fitSignal}
+            selected={selected}
+            onSelect={handleSelect}
+          />
+
+          {!loading && !fragrances.length && (
+            <section className="empty-state">
+              <img className="empty-brand-mark" src={`${import.meta.env.BASE_URL}brand/scent-map-mark.svg`} width="96" height="96" alt="" />
+              <p className="eyebrow">A clearer collection starts here</p>
+              <h2>Map what your nose already knows.</h2>
+              <p>Add an owned fragrance and its community similarity lists together. Relationships become a map—not a verdict.</p>
+              <button className="button button--primary" type="button" onClick={() => setShowAdd(true)}><Plus size={16} /> Add your first fragrance</button>
+            </section>
+          )}
+
+          <div className="map-disclaimer"><CircleHelp size={14} /> No link means unknown, not unique.</div>
         </div>
-
-        <GraphView
-          model={graphModel}
-          showContext={showContext}
-          clusterFocus={clusterFocus}
-          search={search}
-          fitSignal={fitSignal}
-          selected={selected}
-          onSelect={handleSelect}
-        />
-
-        {!loading && !fragrances.length && (
-          <section className="empty-state">
-            <img className="empty-brand-mark" src={`${import.meta.env.BASE_URL}brand/scent-map-mark.svg`} width="96" height="96" alt="" />
-            <p className="eyebrow">A clearer collection starts here</p>
-            <h2>Map what your nose already knows.</h2>
-            <p>Add an owned fragrance and its community similarity lists together. Relationships become a map—not a verdict.</p>
-            <button className="button button--primary" type="button" onClick={() => setShowAdd(true)}><Plus size={16} /> Add your first fragrance</button>
-          </section>
-        )}
-
-        <div className="map-disclaimer"><CircleHelp size={14} /> No link means unknown, not unique.</div>
       </main>
 
       {selected && <DetailsPanel key={`${selected.type}:${selected.id}`} selection={selected} model={graphModel} onClose={() => setSelected(null)} onCapture={openCapture} onHistory={(id) => { setHistoryEventId(id); setShowDuplicates(true) }} />}

@@ -73,7 +73,11 @@ export function edgeDirections(edge: AggregatedEdge) {
   }
 }
 
-function detectCommunities(fragrances: Fragrance[], edges: AggregatedEdge[]): Map<string, number> {
+function detectCommunities(
+  fragrances: Fragrance[],
+  edges: AggregatedEdge[],
+  resolution: number,
+): Map<string, number> {
   if (!fragrances.length) return new Map()
   const graph = new UndirectedGraph()
   for (const fragrance of fragrances) graph.addNode(fragrance.id)
@@ -84,7 +88,7 @@ function detectCommunities(fragrances: Fragrance[], edges: AggregatedEdge[]): Ma
   const raw = louvain(graph, {
     getEdgeWeight: 'weight',
     randomWalk: false,
-    resolution: 1,
+    resolution,
   }) as Record<string, string | number>
 
   const members = new Map<string, string[]>()
@@ -107,9 +111,10 @@ export function buildGraphModel(
   fragrances: Fragrance[],
   observations: SimilarityObservation[],
   enabledSources: Set<SimilaritySource> = new Set(['fragrantica', 'parfumo']),
+  communityResolution = 1,
 ): GraphModel {
   const edges = aggregateEdges(observations, enabledSources)
-  const communities = detectCommunities(fragrances, edges)
+  const communities = detectCommunities(fragrances, edges, communityResolution)
   const nodes = fragrances.map((fragrance) => ({
     ...fragrance,
     cluster: communities.get(fragrance.id) ?? 0,

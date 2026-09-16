@@ -31,6 +31,8 @@ Preview assessments are intentionally cautious: unmatched names and missing link
 
 Observations remain directed in storage. Each displayed edge points toward the referenced fragrance, with arrowheads at both ends for mutual references. Its weight is from 1–4: one point for each unique source and direction. The number and line thickness indicate evidence count, not direction; arrows reflect the enabled sources. Community detection still treats relationships as undirected. A missing link means insufficient evidence, not uniqueness.
 
+The map controls separate search from four labeled filters: **Evidence source**, **Show fragrances**, **Focus group**, and **Group detail**. Open **Group detail** to calibrate the communities. Move it toward **Broader** to combine related neighborhoods, or toward **More separate** to split them into smaller groups. The panel shows the group count and offers **Reset to default**. This changes only the derived grouping and colors; it never changes saved fragrances or relationship evidence.
+
 ## Privacy and backups
 
 The application has no backend and makes no requests to Fragrantica or Parfumo. IndexedDB in the current browser profile is the primary database. Use **Export** regularly to download a versioned JSON backup. Restore validates the entire file and previews record counts before replacing local data.
