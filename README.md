@@ -29,6 +29,12 @@ npm test
 
 Preview assessments are intentionally cautious: unmatched names and missing links count as unknown evidence, not proof that a candidate is unique.
 
+Use **Find duplicates** in the sidebar to scan owned and context fragrances for possible duplicates based on names, brand aliases, and source pages. Suggestions include reasons and warnings; concentrations, flankers, and release years may identify different products. Nothing is merged automatically.
+
+Choose **Review merge**, select the identity to keep, resolve any conflicting source URLs, and choose **Confirm merge**. The merged fragrance remains owned if either record was owned. Captures, dates, page URLs, and incoming and outgoing evidence are retained, while self-links and repeated targets within a capture are removed. The removed identity is remembered as a merged name for future entries and captures.
+
+Choose **Keep separate** to dismiss a pair, and use **Kept separate** > **Review again** to reconsider it. **Merge history** records the original identities and source URL choices. **Undo latest merge** restores the previous records, even after reopening the app, as long as collection data has not changed since that merge.
+
 Select any owned or context fragrance and choose **Edit fragrance** to correct its brand, name, optional variant/concentration, or source links. Clearing an optional field removes its saved value. Editing preserves ownership, incoming and outgoing relationships, and the URLs and dates recorded in past captures. Future captures start with the updated source link.
 
 An edit that matches another fragrance’s exact brand, name, and concentration, including a recognized merged name, is blocked. **Review duplicate** discards the unsaved edit and opens the two saved records in the existing merge review; merging still requires explicit confirmation. Different concentrations remain distinct, and edits do not create aliases for previous names. Existing merged-name recognition is preserved.
