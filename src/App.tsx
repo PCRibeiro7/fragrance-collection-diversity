@@ -21,6 +21,7 @@ import { DuplicateReviewDialog } from './components/DuplicateReviewDialog'
 import { AddFragranceDialog } from './components/AddFragranceDialog'
 import { CaptureDialog } from './components/CaptureDialog'
 import { DetailsPanel } from './components/DetailsPanel'
+import { EditFragranceDialog } from './components/EditFragranceDialog'
 import { GraphView } from './components/GraphView'
 import { Modal } from './components/Modal'
 import { PreviewFragranceDialog } from './components/PreviewFragranceDialog'
@@ -58,6 +59,8 @@ function App() {
   const [showPreview, setShowPreview] = useState(false)
   const [showDuplicates, setShowDuplicates] = useState(false)
   const [historyEventId, setHistoryEventId] = useState<string>()
+  const [editTarget, setEditTarget] = useState<string | null>(null)
+  const [duplicatePair, setDuplicatePair] = useState<[string, string]>()
   const [captureTarget, setCaptureTarget] = useState<{ id: string; source?: SimilaritySource } | null>(null)
   const [selected, setSelected] = useState<SelectedGraphItem>(null)
   const [showContext, setShowContext] = useState(true)
@@ -95,6 +98,7 @@ function App() {
     (item) => capturedKeys.has(`${item.id}:fragrantica`) && capturedKeys.has(`${item.id}:parfumo`),
   ).length
   const selectedTarget = captureTarget ? fragrances.find((item) => item.id === captureTarget.id) : undefined
+  const editingFragrance = editTarget ? fragrances.find((item) => item.id === editTarget) : undefined
 
   const handleSelect = useCallback((selection: SelectedGraphItem) => setSelected(selection), [])
   const openCapture = useCallback((id: string, source?: SimilaritySource) => {
@@ -231,7 +235,7 @@ function App() {
 
         <div className="sidebar-footer">
           <button className="button button--quiet button--full" type="button" disabled={loading} onClick={() => { setShowPreview(true); setSidebarOpen(false) }}><Eye size={15} /> Preview a fragrance</button>
-          <button className="button button--quiet button--full" type="button" disabled={loading} onClick={() => { setHistoryEventId(undefined); setShowDuplicates(true); setSidebarOpen(false) }}><Search size={15} /> Find duplicates</button>
+          <button className="button button--quiet button--full" type="button" disabled={loading} onClick={() => { setHistoryEventId(undefined); setDuplicatePair(undefined); setShowDuplicates(true); setSidebarOpen(false) }}><Search size={15} /> Find duplicates</button>
           <button className="button button--quiet button--full mobile-only" type="button" onClick={exportData}><Download size={15} /> Export backup</button>
           <button className="button button--quiet button--full mobile-only" type="button" onClick={() => importRef.current?.click()}><Upload size={15} /> Restore backup</button>
           <div className="local-note"><Database size={15} /><span>Private & local<br /><small>Stored in this browser</small></span></div>
@@ -346,8 +350,9 @@ function App() {
         </div>
       </main>
 
-      {selected && <DetailsPanel key={`${selected.type}:${selected.id}`} selection={selected} model={graphModel} onClose={() => setSelected(null)} onCapture={openCapture} onHistory={(id) => { setHistoryEventId(id); setShowDuplicates(true) }} />}
-      {showDuplicates && <DuplicateReviewDialog initialEventId={historyEventId} onSelectFragrance={(id) => { setShowDuplicates(false); setSelected({ type: 'node', id }); setShowContext(true); setClusterFocus('all') }} fragrances={fragrances} captures={captures} observations={observations} onClose={() => setShowDuplicates(false)} onMerged={() => { setSelected(null); setClusterFocus('all') }} />}
+      {selected && <DetailsPanel key={`${selected.type}:${selected.id}`} selection={selected} model={graphModel} onClose={() => setSelected(null)} onCapture={openCapture} onEdit={(id) => { setEditTarget(id); setSidebarOpen(false) }} onHistory={(id) => { setHistoryEventId(id); setDuplicatePair(undefined); setShowDuplicates(true) }} />}
+      {editingFragrance && <EditFragranceDialog key={editingFragrance.id} fragrance={editingFragrance} onClose={() => setEditTarget(null)} onSaved={(id) => { setSelected({ type: 'node', id }); flash('Fragrance updated') }} onReviewDuplicate={(pair) => { setEditTarget(null); setDuplicatePair(pair); setHistoryEventId(undefined); setShowDuplicates(true) }} />}
+      {showDuplicates && <DuplicateReviewDialog initialPairIds={duplicatePair} initialEventId={historyEventId} onSelectFragrance={(id) => { setShowDuplicates(false); setSelected({ type: 'node', id }); setShowContext(true); setClusterFocus('all') }} fragrances={fragrances} captures={captures} observations={observations} onClose={() => setShowDuplicates(false)} onMerged={() => { setSelected(null); setClusterFocus('all') }} />}
       {showPreview && <PreviewFragranceDialog fragrances={fragrances} observations={observations} onClose={() => setShowPreview(false)} />}
       {showAdd && <AddFragranceDialog onClose={() => setShowAdd(false)} onSaved={(id) => setSelected({ type: 'node', id })} />}
       {selectedTarget && (

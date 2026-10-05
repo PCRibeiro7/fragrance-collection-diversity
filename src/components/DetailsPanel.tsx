@@ -1,7 +1,7 @@
 import { useDuplicateReviewState } from '../data/useDuplicateReviewState'
 import { forgetAlias } from '../data/duplicateDecisions'
 import { useState } from 'react'
-import { Trash2, ArrowRight, ExternalLink, Link2, Network, Plus, X } from 'lucide-react'
+import { Trash2, ArrowRight, ExternalLink, Link2, Network, Pencil, Plus, X } from 'lucide-react'
 import { displayName } from '../domain/identity'
 import { directNeighborIds, findSharedNeighbors } from '../domain/graph'
 import type { GraphModel, SelectedGraphItem, SimilaritySource } from '../domain/types'
@@ -14,9 +14,10 @@ interface DetailsPanelProps {
   onClose: () => void
   onCapture: (fragranceId: string, source?: SimilaritySource) => void
   onHistory: (eventId: string) => void
+  onEdit: (fragranceId: string) => void
 }
 
-export function DetailsPanel({ selection, model, onClose, onCapture, onHistory }: DetailsPanelProps) {
+export function DetailsPanel({ selection, model, onClose, onCapture, onHistory, onEdit }: DetailsPanelProps) {
   const reviewState = useDuplicateReviewState()
   const [aliasError, setAliasError] = useState('')
   const [aliasBusy, setAliasBusy] = useState(false)
@@ -127,6 +128,9 @@ export function DetailsPanel({ selection, model, onClose, onCapture, onHistory }
         {aliasError && <p role="alert" className="form-error">{aliasError}</p>}
       </section>}
       <div className="details-actions">
+        <button className="button button--quiet button--full" type="button" onClick={() => onEdit(fragrance.id)} disabled={deleting}>
+          <Pencil size={15} /> Edit fragrance
+        </button>
         <button className="button button--primary button--full" type="button" onClick={() => onCapture(fragrance.id)} disabled={!fragrance.owned || deleting}>
           <Plus size={15} /> Capture relationships
         </button>

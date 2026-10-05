@@ -5,7 +5,7 @@ import { createBackup, restoreBackup, validateBackup } from './backup'
 import { keepSeparate, reviewAgain, forgetAlias } from './duplicateDecisions'
 import { mergeFragrances, undoMerge } from './merge'
 import { readDuplicateReviewState } from './useDuplicateReviewState'
-import { deleteFragrance, replaceCapture, upsertFragrance } from './repository'
+import { deleteFragrance, replaceCapture, updateFragrance, upsertFragrance } from './repository'
 import { identityKey } from '../domain/identity'
 
 let database: ScentMapDatabase
@@ -14,13 +14,14 @@ afterEach(async () => { vi.restoreAllMocks(); await database.delete() })
 const add = (name: string, owned = true) => upsertFragrance({ brand: 'Brand', name, owned }, database)
 
 describe('persistent decisions and history', () => {
-  it('keeps decisions after database reopen and identity edits until explicitly reset', async () => {
+  it('keeps decisions after database reopen and resets them after identity edits', async () => {
     const a = await add('One'), b = await add('Two')
     await keepSeparate(a.id, b.id, database)
     database.close(); await database.open()
-    await database.fragrances.update(a.id, { name: 'Renamed' })
     const [decision] = await database.dismissals.toArray()
     expect(decision.left.name).toBe('One')
+    await updateFragrance(a.id, { brand: a.brand, name: 'Renamed' }, database)
+    expect(await database.dismissals.count()).toBe(0)
     await keepSeparate(b.id, a.id, database)
     expect(await database.dismissals.count()).toBe(1)
     await reviewAgain(decision.id, database)

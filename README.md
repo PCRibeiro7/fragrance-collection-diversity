@@ -29,6 +29,12 @@ npm test
 
 Preview assessments are intentionally cautious: unmatched names and missing links count as unknown evidence, not proof that a candidate is unique.
 
+Select any owned or context fragrance and choose **Edit fragrance** to correct its brand, name, optional variant/concentration, or source links. Clearing an optional field removes its saved value. Editing preserves ownership, incoming and outgoing relationships, and the URLs and dates recorded in past captures. Future captures start with the updated source link.
+
+An edit that matches another fragrance’s exact brand, name, and concentration, including a recognized merged name, is blocked. **Review duplicate** discards the unsaved edit and opens the two saved records in the existing merge review; merging still requires explicit confirmation. Different concentrations remain distinct, and edits do not create aliases for previous names. Existing merged-name recognition is preserved.
+
+Changing identity fields or source links resets keep-separate decisions involving that fragrance so those pairs can be reviewed again. Saved changes also make the latest merge undo unavailable to protect newer edits; saving unchanged details does not.
+
 Observations remain directed in storage. Each displayed edge points toward the referenced fragrance, with arrowheads at both ends for mutual references. Its weight is from 1–4: one point for each unique source and direction. The number and line thickness indicate evidence count, not direction; arrows reflect the enabled sources. Community detection still treats relationships as undirected. A missing link means insufficient evidence, not uniqueness.
 
 The map controls separate search from four labeled filters: **Evidence source**, **Show fragrances**, **Focus group**, and **Group detail**. Open **Group detail** to calibrate the communities. Move it toward **Broader** to combine related neighborhoods, or toward **More separate** to split them into smaller groups. The panel shows the group count and offers **Reset to default**. This changes only the derived grouping and colors; it never changes saved fragrances or relationship evidence.

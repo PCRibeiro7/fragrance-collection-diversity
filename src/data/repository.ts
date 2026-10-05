@@ -1,10 +1,11 @@
 import { cleanupReviewReferences } from './duplicateDecisions'
 import { db, type ScentMapDatabase } from './db'
-import { fragranceIdentityKey, identityKey, normalizeFragranceInput } from '../domain/identity'
+import { displayName, fragranceIdentityKey, identityKey, normalizeFragranceInput, validateHttpUrl } from '../domain/identity'
 import type {
   CaptureTargetInput,
   Fragrance,
   FragranceInput,
+  FragranceEditInput,
   ReplaceCaptureInput,
   SimilarityObservation,
   SourceCapture,
@@ -25,6 +26,57 @@ function cleanInput(input: FragranceInput): FragranceInput {
       parfumo: input.sourceUrls?.parfumo?.trim() || undefined,
     },
   }
+}
+
+export class FragranceIdentityConflict extends Error {
+  readonly fragranceId: string
+
+  constructor(fragrance: Fragrance) {
+    super(`This identity already belongs to ${displayName(fragrance)}. Review the duplicate before merging these records.`)
+    this.name = 'FragranceIdentityConflict'
+    this.fragranceId = fragrance.id
+  }
+}
+
+export async function updateFragrance(
+  id: string,
+  input: FragranceEditInput,
+  database: ScentMapDatabase = db,
+): Promise<Fragrance> {
+  return database.transaction('rw', database.fragrances, database.aliases, database.dismissals, async () => {
+    const current = await database.fragrances.get(id)
+    if (!current) throw new Error('This fragrance no longer exists.')
+    const clean = cleanInput(input)
+    if (!clean.brand || !clean.name) throw new Error('Brand and fragrance name are required.')
+    if (!validateHttpUrl(clean.sourceUrls?.fragrantica) || !validateHttpUrl(clean.sourceUrls?.parfumo)) {
+      throw new Error('Source links must be valid http or https URLs.')
+    }
+    const unchanged = current.brand === clean.brand && current.name === clean.name &&
+      current.variant === clean.variant &&
+      current.sourceUrls.fragrantica === clean.sourceUrls?.fragrantica &&
+      current.sourceUrls.parfumo === clean.sourceUrls?.parfumo
+    if (unchanged) return current
+
+    const normalized = normalizeFragranceInput(clean)
+    const matches = await database.fragrances
+      .where('[normalizedBrand+normalizedName+normalizedVariant]')
+      .equals([normalized.normalizedBrand, normalized.normalizedName, normalized.normalizedVariant]).toArray()
+    const conflict = matches.find((item) => item.id !== id)
+    if (conflict) throw new FragranceIdentityConflict(conflict)
+    const alias = await database.aliases.get(identityKey(clean))
+    if (alias && alias.fragranceId !== id) {
+      const target = await database.fragrances.get(alias.fragranceId)
+      if (target) throw new FragranceIdentityConflict(target)
+    }
+
+    const updated: Fragrance = {
+      ...current, brand: clean.brand, name: clean.name, variant: clean.variant,
+      sourceUrls: clean.sourceUrls ?? {}, ...normalized, updatedAt: new Date().toISOString(),
+    }
+    await database.fragrances.put(updated)
+    await database.dismissals.filter((item) => item.leftId === id || item.rightId === id).delete()
+    return updated
+  })
 }
 
 export async function upsertFragrance(

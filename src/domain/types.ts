@@ -51,6 +51,8 @@ export interface FragranceInput {
   sourceUrls?: SourceUrls
 }
 
+export type FragranceEditInput = Pick<FragranceInput, 'brand' | 'name' | 'variant' | 'sourceUrls'>
+
 export interface CaptureTargetInput extends FragranceInput {
   existingId?: string
 }

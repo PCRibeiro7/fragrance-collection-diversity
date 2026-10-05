@@ -43,7 +43,7 @@ describe('previously merged names in the app', () => {
 
   it('links previous names to history and removes recognition without deleting history', async () => {
     const onHistory = vi.fn()
-    render(<DetailsPanel selection={{ type: 'node', id: canonical.id }} model={{ nodes: [{ ...canonical, cluster: 0 }], edges: [], clusters: [0] }} onClose={() => {}} onCapture={() => {}} onHistory={onHistory} />)
+    render(<DetailsPanel selection={{ type: 'node', id: canonical.id }} model={{ nodes: [{ ...canonical, cluster: 0 }], edges: [], clusters: [0] }} onClose={() => {}} onCapture={() => {}} onEdit={() => {}} onHistory={onHistory} />)
     fireEvent.click(await screen.findByText('View merge history'))
     expect(onHistory).toHaveBeenCalledWith(eventId)
     fireEvent.click(screen.getByText('Stop recognizing this name'))

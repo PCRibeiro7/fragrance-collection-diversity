@@ -7,11 +7,12 @@ interface ModalProps extends PropsWithChildren {
   onClose: () => void
   footer?: ReactNode
   wide?: boolean
+  dismissDisabled?: boolean
 }
 
-export function Modal({ title, eyebrow, onClose, footer, wide, children }: ModalProps) {
+export function Modal({ title, eyebrow, onClose, footer, wide, dismissDisabled, children }: ModalProps) {
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className="modal-backdrop" role="presentation" onMouseDown={() => { if (!dismissDisabled) onClose() }}>
       <section
         className={`modal ${wide ? 'modal--wide' : ''}`}
         role="dialog"
@@ -24,7 +25,7 @@ export function Modal({ title, eyebrow, onClose, footer, wide, children }: Modal
             {eyebrow && <p className="eyebrow">{eyebrow}</p>}
             <h2 id="modal-title">{title}</h2>
           </div>
-          <button className="icon-button" type="button" aria-label="Close" onClick={onClose}>
+          <button className="icon-button" type="button" aria-label="Close" onClick={onClose} disabled={dismissDisabled}>
             <X size={19} />
           </button>
         </header>

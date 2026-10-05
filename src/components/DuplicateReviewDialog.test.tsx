@@ -25,6 +25,22 @@ function show(fragrances = items) {
 async function ready() { await waitFor(() => expect(screen.queryByText(/Loading saved review decisions/)).not.toBeInTheDocument()) }
 
 describe('duplicate review', () => {
+  it('reports a missing direct-review record and prevents confirmation', async () => {
+    render(<DuplicateReviewDialog initialPairIds={['one', 'missing']} fragrances={items} captures={[]} observations={[]} onClose={() => {}} onMerged={() => {}} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('no longer exists')
+    expect(screen.queryByRole('button', { name: 'Confirm merge' })).not.toBeInTheDocument()
+  })
+
+  it('uses current records during pair review and prevents merging a removed record', async () => {
+    const props = { initialPairIds: ['one', 'two'] as [string, string], captures: [], observations: [], onClose: () => {}, onMerged: () => {} }
+    const view = render(<DuplicateReviewDialog {...props} fragrances={items} />)
+    await ready()
+    view.rerender(<DuplicateReviewDialog {...props} fragrances={[{ ...items[0], name: 'Corrected' }, items[1]]} />)
+    expect(screen.getByRole('radio', { name: /Corrected/ })).toBeInTheDocument()
+    view.rerender(<DuplicateReviewDialog {...props} fragrances={[items[0]]} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('no longer exists')
+    expect(screen.queryByRole('button', { name: 'Confirm merge' })).not.toBeInTheDocument()
+  })
   it('requires URL selection before merging and exposes permanent history and undo', async () => {
     show()
     await ready()

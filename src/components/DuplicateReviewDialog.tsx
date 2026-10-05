@@ -15,16 +15,33 @@ interface Props {
   onMerged: () => void
   onSelectFragrance?: (id: string) => void
   initialEventId?: string
+  initialPairIds?: [string, string]
 }
 
-export function DuplicateReviewDialog({ fragrances, captures, observations, onClose, onMerged, onSelectFragrance, initialEventId }: Props) {
+export function DuplicateReviewDialog({ fragrances, captures, observations, onClose, onMerged, onSelectFragrance, initialEventId, initialPairIds }: Props) {
   const candidates = useMemo(() => findDuplicateFragrances(fragrances), [fragrances])
   const persisted = useDuplicateReviewState()
   const [tab, setTab] = useState<'suggestions' | 'separate' | 'history'>(initialEventId ? 'history' : 'suggestions')
   const [eventFilter, setEventFilter] = useState(initialEventId)
   const dismissed = new Set(persisted.dismissals.map((item) => item.id))
-  const [review, setReview] = useState<DuplicateCandidate | null>(null)
-  const [keepId, setKeepId] = useState('')
+  const [reviewPair, setReviewPair] = useState<[string, string] | null>(initialPairIds ?? null)
+  const review = useMemo<DuplicateCandidate | null>(() => {
+    if (!reviewPair) return null
+    const left = fragrances.find((item) => item.id === reviewPair[0])
+    const right = fragrances.find((item) => item.id === reviewPair[1])
+    if (!left || !right || left.id === right.id) return null
+    return candidates.find((item) => [item.left.id, item.right.id].includes(left.id) && [item.left.id, item.right.id].includes(right.id)) ?? {
+      key: [left.id, right.id].sort().join(':'), left, right, confidence: 'review',
+      reason: 'Review requested for these saved records',
+      warnings: left.normalizedVariant !== right.normalizedVariant ? ['Variant fields differ. Confirm the concentration or edition.'] : [],
+    }
+  }, [reviewPair, fragrances, candidates])
+  const [keepId, setKeepId] = useState(() => {
+    if (!initialPairIds) return ''
+    const left = fragrances.find((item) => item.id === initialPairIds[0])
+    const right = fragrances.find((item) => item.id === initialPairIds[1])
+    return right?.owned && !left?.owned ? right.id : initialPairIds[0]
+  })
   const [choices, setChoices] = useState<SourceUrls>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -35,7 +52,7 @@ export function DuplicateReviewDialog({ fragrances, captures, observations, onCl
   ) : []
 
   function openReview(candidate: DuplicateCandidate) {
-    setReview(candidate)
+    setReviewPair([candidate.left.id, candidate.right.id])
     setKeepId(candidate.right.owned && !candidate.left.owned ? candidate.right.id : candidate.left.id)
     setChoices({})
     setError('')
@@ -47,7 +64,7 @@ export function DuplicateReviewDialog({ fragrances, captures, observations, onCl
     setError('')
     try {
       await mergeFragrances(keepId, keepId === review.left.id ? review.right.id : review.left.id, choices)
-      setReview(null)
+      setReviewPair(null)
       setMessage('Fragrances merged and recorded in history. Undo remains available after reopening the app until collection data changes.')
       onMerged()
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Merge failed.') }
@@ -76,11 +93,12 @@ export function DuplicateReviewDialog({ fragrances, captures, observations, onCl
   return <Modal title={review ? 'Review merge' : 'Find duplicate fragrances'} eyebrow="Collection cleanup" wide onClose={() => { if (!busy) onClose() }}
     footer={<>
       {review ? <>
-        <button className="button button--quiet" disabled={busy} onClick={() => setReview(null)}>Back to suggestions</button>
-        <button className="button button--primary" disabled={busy || conflicts.some((source) => !choices[source])} onClick={merge}>{busy ? 'Merging…' : 'Confirm merge'}</button>
+        <button className="button button--quiet" disabled={busy} onClick={() => setReviewPair(null)}>Back to suggestions</button>
+        <button className="button button--primary" disabled={busy || persisted.loading || Boolean(persisted.error) || conflicts.some((source) => !choices[source])} onClick={merge}>{busy ? 'Merging…' : 'Confirm merge'}</button>
       </> : <button className="button button--quiet" disabled={busy} onClick={onClose}>Done</button>}
     </>}>
     {(error || persisted.error) && <p role="alert" className="form-error">{error || persisted.error}</p>}
+    {reviewPair && !review && <p role="alert" className="form-error">A fragrance in this pair no longer exists. Close this dialog and review the current collection.</p>}
     {message && <p role="status">{message}</p>}
     {persisted.undoEventId && !review && <div>
       <button className="button button--quiet" disabled={busy || !persisted.canUndo} onClick={revert}>Undo latest merge</button>
@@ -99,6 +117,7 @@ export function DuplicateReviewDialog({ fragrances, captures, observations, onCl
     </div>}
     {persisted.loading && <p role="status">Loading saved review decisions...</p>}
     {review ? <div className="form-stack">
+      {initialPairIds && initialPairIds.includes(review.left.id) && initialPairIds.includes(review.right.id) && <p>Unsaved edits were discarded. This review uses the current saved records.</p>}
       <p>{review.reason}. Choose the record whose brand, name, and variant you want to keep.</p>
       {review.warnings.map((warning) => <p className="duplicate-warning" key={warning}>{warning}</p>)}
       <fieldset className="duplicate-options"><legend>Keep this identity</legend>
@@ -119,7 +138,7 @@ export function DuplicateReviewDialog({ fragrances, captures, observations, onCl
       <p>The other fragrance record is removed. Only the chosen identity and source URLs remain on the fragrance. History retains the original identities. Undo restores the previous records if collection data has not changed since the merge.</p>
     </div> : <div className="form-stack" role="tabpanel" id="duplicate-panel" aria-labelledby={`tab-${tab}`}>
       {tab === 'separate' ? <>
-        <p>These pairs stay separate until you choose Review again. Editing names or source URLs does not reset your decision.</p>
+        <p>These pairs stay separate until you choose Review again or edit either fragrance’s brand, name, concentration, or source links.</p>
         {!persisted.dismissals.length && !persisted.loading && <p>No pairs marked as separate yet.</p>}
         {persisted.dismissals.map((item) => <article className="duplicate-card" key={item.id}>
           <strong>{displayName(fragrances.find((f) => f.id === item.leftId) ?? item.left)}</strong>
