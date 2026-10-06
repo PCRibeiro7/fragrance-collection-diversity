@@ -6,12 +6,17 @@ import { aggregateEdges } from '../domain/graph'
 import { displayName, identityKey } from '../domain/identity'
 import { parseSimilarityList, type ParsedSimilarityLine } from '../domain/parser'
 import { analyzeFragrancePreview, type PreviewAnalysis, type RedundancyLevel } from '../domain/preview'
-import type { Fragrance, SimilarityObservation, SimilaritySource } from '../domain/types'
+import { predictFragranceGroup } from '../domain/previewGroups'
+import type { Fragrance, GraphModel, SimilarityObservation, SimilaritySource } from '../domain/types'
 import { Modal } from './Modal'
+import { PredictedGroup } from './PredictedGroup'
 
 interface PreviewFragranceDialogProps {
   fragrances: Fragrance[]
   observations: SimilarityObservation[]
+  currentModel: GraphModel
+  enabledSources: Set<SimilaritySource>
+  groupResolution: number
   onClose: () => void
 }
 
@@ -44,7 +49,7 @@ const VERDICTS: Record<RedundancyLevel, { title: string; summary: string }> = {
   },
 }
 
-export function PreviewFragranceDialog({ fragrances, observations, onClose }: PreviewFragranceDialogProps) {
+export function PreviewFragranceDialog({ fragrances, observations, currentModel, enabledSources, groupResolution, onClose }: PreviewFragranceDialogProps) {
   const reviewState = useDuplicateReviewState()
   const [brand, setBrand] = useState('')
   const [name, setName] = useState('')
@@ -55,7 +60,14 @@ export function PreviewFragranceDialog({ fragrances, observations, onClose }: Pr
   })
   const [error, setError] = useState('')
   const [result, setResult] = useState<PreviewResult>()
+  const [previewResolution, setPreviewResolution] = useState(groupResolution)
   const edges = useMemo(() => aggregateEdges(observations), [observations])
+  const groupPrediction = useMemo(() => result ? predictFragranceGroup({
+    candidate: { brand, name, variant },
+    lists: { fragrantica: lists.fragrantica.rows, parfumo: lists.parfumo.rows },
+    fragrances, aliases: reviewState.aliases, observations, currentModel,
+    enabledSources, resolution: previewResolution,
+  }) : undefined, [result, brand, name, variant, lists, fragrances, reviewState.aliases, observations, currentModel, enabledSources, previewResolution])
 
   function updateRow(source: SimilaritySource, id: string, field: 'brand' | 'name' | 'variant', value: string) {
     setLists((current) => ({
@@ -109,7 +121,7 @@ export function PreviewFragranceDialog({ fragrances, observations, onClose }: Pr
     })
   }
 
-  if (result) {
+  if (result && groupPrediction) {
     const verdict = result.existing?.owned
       ? { title: 'Already in your collection', summary: `${displayName(result.existing)} is already marked as owned.` }
       : VERDICTS[result.analysis.level]
@@ -138,6 +150,8 @@ export function PreviewFragranceDialog({ fragrances, observations, onClose }: Pr
             <div><Link2 size={16} /><strong>{result.analysis.directOwnedCount}</strong><span>direct owned overlaps</span></div>
             <div><CircleHelp size={16} /><strong>{result.matchedCount}/{result.inputCount}</strong><span>pasted names matched</span></div>
           </div>
+
+          <PredictedGroup prediction={groupPrediction} mapResolution={groupResolution} onResolutionChange={setPreviewResolution} />
 
           {result.analysis.matches.length > 0 ? (
             <section className="preview-section">
@@ -169,7 +183,7 @@ export function PreviewFragranceDialog({ fragrances, observations, onClose }: Pr
           )}
 
           {result.inputCount > result.matchedCount && (
-            <p className="preview-note"><CircleHelp size={15} /> {result.inputCount - result.matchedCount} pasted {result.inputCount - result.matchedCount === 1 ? 'name is' : 'names are'} not on the map yet, so they cannot contribute to shared-context analysis.</p>
+            <p className="preview-note"><CircleHelp size={15} /> {result.inputCount - result.matchedCount} pasted {result.inputCount - result.matchedCount === 1 ? 'name is' : 'names are'} not on the map yet. They participate as temporary context in the group simulation for enabled sources, but lack saved profiles for shared-context redundancy analysis.</p>
           )}
           {!fragrances.some((fragrance) => fragrance.owned) && <p className="preview-note">Add at least one owned fragrance before using this comparison.</p>}
           <p className="preview-caveat">This is an evidence summary, not a scent verdict. Missing links and unmatched names mean unknown—not unique.</p>
@@ -192,7 +206,7 @@ export function PreviewFragranceDialog({ fragrances, observations, onClose }: Pr
       }
     >
       <form id="preview-fragrance" className="form-stack" onSubmit={handlePreview}>
-        <p className="preview-intro">Compare a candidate with your collection without saving it. Similarity lists make the preview much more useful.</p>
+        <p className="preview-intro">Check collection overlap and predict the candidate’s group without saving it. Group prediction starts with the map’s evidence source and Group detail settings. Adjust Group detail in the results to explore other groupings. For an existing fragrance, a pasted list replaces that source’s outgoing relationships in the simulation; blank lists retain saved evidence.</p>
         <div className="field-row">
           <label className="field">
             <span>Brand</span>

@@ -353,7 +353,7 @@ function App() {
       {selected && <DetailsPanel key={`${selected.type}:${selected.id}`} selection={selected} model={graphModel} onClose={() => setSelected(null)} onCapture={openCapture} onEdit={(id) => { setEditTarget(id); setSidebarOpen(false) }} onHistory={(id) => { setHistoryEventId(id); setDuplicatePair(undefined); setShowDuplicates(true) }} />}
       {editingFragrance && <EditFragranceDialog key={editingFragrance.id} fragrance={editingFragrance} onClose={() => setEditTarget(null)} onSaved={(id) => { setSelected({ type: 'node', id }); flash('Fragrance updated') }} onReviewDuplicate={(pair) => { setEditTarget(null); setDuplicatePair(pair); setHistoryEventId(undefined); setShowDuplicates(true) }} />}
       {showDuplicates && <DuplicateReviewDialog initialPairIds={duplicatePair} initialEventId={historyEventId} onSelectFragrance={(id) => { setShowDuplicates(false); setSelected({ type: 'node', id }); setShowContext(true); setClusterFocus('all') }} fragrances={fragrances} captures={captures} observations={observations} onClose={() => setShowDuplicates(false)} onMerged={() => { setSelected(null); setClusterFocus('all') }} />}
-      {showPreview && <PreviewFragranceDialog fragrances={fragrances} observations={observations} onClose={() => setShowPreview(false)} />}
+      {showPreview && <PreviewFragranceDialog fragrances={fragrances} observations={observations} currentModel={graphModel} enabledSources={enabledSources} groupResolution={groupResolution} onClose={() => setShowPreview(false)} />}
       {showAdd && <AddFragranceDialog onClose={() => setShowAdd(false)} onSaved={(id) => setSelected({ type: 'node', id })} />}
       {selectedTarget && (
         <CaptureDialog

@@ -20,7 +20,7 @@ npm test
 
 ## Workflow
 
-1. Use **Preview a fragrance** to compare a candidate with the collection without saving it. Paste either community similarity list to see direct owned overlaps, shared context, and the closest known profiles.
+1. Use **Preview a fragrance** to compare a candidate with the collection without saving it. Paste either community similarity list to see direct owned overlaps, shared context, the closest known profiles, and its predicted group.
 2. Add an owned fragrance with its brand, name, and optional concentration/source links.
 3. Select the fragrance and choose **Capture relationships**.
 4. Pick Fragrantica or Parfumo and paste one related fragrance per line. `Brand | Fragrance` is the preferred format.
@@ -28,6 +28,12 @@ npm test
 6. Replace the saved list and inspect the resulting graph, evidence, shared context, and collection coverage.
 
 Preview assessments are intentionally cautious: unmatched names and missing links count as unknown evidence, not proof that a candidate is unique.
+
+**Predicted group** temporarily adds the candidate and pasted relationships, including unmatched names as new context fragrances, and reruns grouping using the map’s current **Evidence source** and **Group detail** settings. Search, **Show fragrances**, and **Focus group** do not limit the simulation. The result shows whether the candidate would join an existing group or form a new group, current group labels and colors, and predicted members. It flags when multiple current groups come together or only part of a group would remain with the candidate. Expand the member list to see everyone, including temporary context.
+
+Adjust the **Group detail** slider inside the preview results to update the predicted grouping immediately, from **Broader** to **More separate**. The slider starts at the map’s setting and changes only the current preview; the main map and its saved preference stay unchanged. **Reset to map setting** restores the starting value. Group labels and colors continue to identify groups on the main map, so partial-group and regrouping notices show how the prediction differs from those groups. Editing the inputs retains the preview’s slider value; closing and reopening starts from the map’s setting again.
+
+For a candidate already on the map, each nonempty pasted list replaces its outgoing relationships for that source in the simulation. Blank lists retain saved evidence, and incoming relationships remain intact. The redundancy assessment continues to summarize known profiles using both sources and saved evidence. Temporary context contributes to group prediction but has no saved profile for shared-context redundancy analysis. No fragrances, relationships, or preferences are saved by previewing. A separate predicted group is not proof of uniqueness, and predictions can change as evidence grows.
 
 Use **Find duplicates** in the sidebar to scan owned and context fragrances for possible duplicates based on names, brand aliases, and source pages. Suggestions include reasons and warnings; concentrations, flankers, and release years may identify different products. Nothing is merged automatically.
 

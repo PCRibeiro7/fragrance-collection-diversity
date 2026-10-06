@@ -67,3 +67,61 @@ describe('fragrance editing in the app', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
+
+describe('fragrance group previews in the app', () => {
+  it('uses map source and detail settings while ignoring search, visibility, and group focus', async () => {
+    await upsertFragrance({ brand: 'Brand', name: 'Owned', owned: true })
+    await upsertFragrance({ brand: 'Brand', name: 'Context' })
+    render(<App />)
+    await screen.findByRole('button', { name: 'Map Context' })
+    fireEvent.change(screen.getByLabelText('Evidence source'), { target: { value: 'parfumo' } })
+    const detailPanel = screen.getByLabelText('Group detail: broader groups to more separate groups').closest('details')!
+    fireEvent.click(detailPanel.querySelector('summary')!)
+    fireEvent.change(screen.getByLabelText('Group detail: broader groups to more separate groups'), { target: { value: '0.4' } })
+    fireEvent.change(screen.getByLabelText('Find a fragrance'), { target: { value: 'No match' } })
+    fireEvent.change(screen.getByLabelText('Show fragrances'), { target: { value: 'owned' } })
+    const focus = screen.getByLabelText('Focus similarity group') as HTMLSelectElement
+    const ownedOption = [...focus.options].find((option) => option.text === 'Owned')!
+    fireEvent.change(focus, { target: { value: ownedOption.value } })
+
+    async function preview() {
+      fireEvent.click(screen.getByRole('button', { name: 'Preview a fragrance' }))
+      fireEvent.change(screen.getByPlaceholderText('Diptyque'), { target: { value: 'Brand' } })
+      fireEvent.change(screen.getByPlaceholderText('Philosykos'), { target: { value: 'Candidate' } })
+      fireEvent.change(screen.getByLabelText('Parfumo relationships'), { target: { value: 'Brand | Context' } })
+      await waitFor(() => expect(screen.getByRole('button', { name: /check redundancy/i })).toBeEnabled())
+      fireEvent.click(screen.getByRole('button', { name: /check redundancy/i }))
+    }
+
+    await preview()
+    expect(screen.getByText('Parfumo · Group detail: Broad (0.4)')).toBeInTheDocument()
+    const groupSection = screen.getByRole('region', { name: 'Predicted group' })
+    expect(within(groupSection).getByText('Would join an existing group')).toBeInTheDocument()
+    expect(within(groupSection).getByText('Context (context only)')).toBeInTheDocument()
+    expect(within(groupSection).getByText('Brand · Context')).toBeInTheDocument()
+    const preferenceBefore = window.localStorage.getItem('scent-map-group-resolution')
+    fireEvent.change(within(groupSection).getByRole('slider'), { target: { value: '2.5' } })
+    expect(within(groupSection).getByText('Would form a new group')).toBeInTheDocument()
+    expect(screen.getByLabelText('Group detail: broader groups to more separate groups')).toHaveValue('0.4')
+    expect(window.localStorage.getItem('scent-map-group-resolution')).toBe(preferenceBefore)
+    fireEvent.click(screen.getByRole('button', { name: 'Close preview' }))
+
+    await preview()
+    expect(screen.getByRole('slider', { name: /preview group detail/i })).toHaveValue('0.4')
+    expect(screen.getByText('Would join an existing group')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close preview' }))
+
+    fireEvent.change(screen.getByLabelText('Evidence source'), { target: { value: 'fragrantica' } })
+    await preview()
+    expect(screen.getByText('Not enough evidence to predict')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close preview' }))
+
+    fireEvent.change(screen.getByLabelText('Evidence source'), { target: { value: 'parfumo' } })
+    fireEvent.change(screen.getByLabelText('Group detail: broader groups to more separate groups'), { target: { value: '2.5' } })
+    await preview()
+    expect(screen.getByText('Would form a new group')).toBeInTheDocument()
+    expect(screen.getByText('Parfumo · Group detail: Most separate (2.5)')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close preview' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }))
+  })
+})
