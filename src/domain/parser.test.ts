@@ -133,6 +133,63 @@ describe('similarity list parser', () => {
     )
   })
 
+  it('extracts the 30 Dior related cards with separate concentrations and ignores following page sections', () => {
+    const entries = [
+      ['Maison Alhambra', 'Dark Door Sport'],
+      ['Issey Miyake', "L'Eau d'Issey pour Homme V\u00e9tiver"],
+      ['Dior', 'Dior Homme (2020)', 'Eau de Toilette'],
+      ['Moncler', 'Moncler Sunrise pour Homme'],
+      ['Fragrance World', "Parfum d'Hommes Sport"],
+      ['Louis Vuitton', 'Sur la Route'],
+      ['Loewe', '7 Cobalt'],
+      ['Editions de Parfums Fr\u00e9d\u00e9ric Malle', 'Uncut Gem'],
+      ['Porsche Design', 'Porsche Design Sport'],
+      ['Abercrombie & Fitch', 'Authentic Man'],
+      ['Amouage', 'Search'],
+      ['Louis Vuitton', 'M\u00e9t\u00e9ore'],
+      ['Givenchy', 'Gentleman Society', 'Eau de Parfum Sport'],
+      ['Louis Vuitton', "L'Immensit\u00e9"],
+      ['Issey Miyake', "L'Eau d'Issey pour Homme", 'Eau de Toilette'],
+      ['Grauton Parfums', 'Malachitgrau'],
+      ['Issey Miyake', "Le Sel d'Issey", 'Eau de Parfum'],
+      ['Ex Nihilo', 'Citizen X'],
+      ['Dolce & Gabbana', 'D&G Masculine', 'Eau de Toilette'],
+      ['Essential Parfums', 'Bois Imp\u00e9rial', 'Eau de Parfum'],
+      ['Caron', 'Pour Un Homme de Caron Le Matin'],
+      ['Bottega Veneta', 'Illusione', 'Eau de Toilette'],
+      ['Kenzo', "L'Eau Kenzo Bois\u00e9e"],
+      ['Versace', 'Eros Energy'],
+      ['Dior', 'Dior Homme Sport (2012)', 'Eau de Toilette'],
+      ['Dior', 'Dior Homme Sport (2017)'],
+      ['Dior', 'Sauvage Elixir'],
+      ['Mancera', 'Cedrat Boise'],
+      ['Giorgio Armani', 'Acqua di Gi\u00f2 Profumo', 'Parfum'],
+      ['Fragrance One', 'Office for Men'],
+    ]
+    const text = [
+      ...entries.flatMap(([brand, name, concentration]) => [
+        `${name}${concentration ? ` (${concentration})` : ''} by ${brand}`,
+        name,
+        ...(concentration ? [concentration] : []),
+      ]),
+      'Reviews', '89 in-depth fragrance descriptions',
+      'Popular', '06/23/2024', '9.5', 'Scent', '6', 'Longevity', '6', 'Sillage',
+      'Smirky', '670 Reviews', 'Awesome sporty masculine fragrance',
+      'Dior Homme Sport is an awesome, fresh and sporty masculine fragrance.',
+      'Statements', '315 short views on the fragrance',
+      'Charts', 'This is how the community classifies the fragrance.',
+      'Images', '35 fragrance photos of the community',
+      'Popular by Dior', 'Dior Homme Intense (2011) by Dior', 'Dior Homme Intense (2011)',
+      'Also liked', 'Naxos by Xerjoff', 'Naxos',
+    ].join('\r\n\r\n')
+
+    expect(parseSimilarityList(text).map(({ brand, name }) => ({ brand, name }))).toEqual(
+      entries.map(([brand, name, concentration]) => ({
+        brand, name: `${name}${concentration ? ` ${concentration}` : ''}`,
+      })),
+    )
+  })
+
   it('applies a trailing concentration to each alias in a Parfumo card', () => {
     const text = [
       'Tuscany per Uomo / Etruscan (Eau de Toilette) by Aramis',
@@ -194,19 +251,27 @@ describe('similarity list parser', () => {
     expect(parseSimilarityList([
       'Tuscany per Uomo / Etruscan (Eau de Toilette) by Aramis',
       'Tuscany per Uomo Eau de Parfum',
+      'Dior Homme (2020) (Eau de Toilette) by Dior',
+      'Dior Homme (2020)',
+      'Eau de Parfum',
       'Somebody by Night',
       'Other fragrance',
     ].join('\n'))).toMatchObject([
       { brand: '', name: 'Tuscany per Uomo / Etruscan (Eau de Toilette) by Aramis' },
       { brand: '', name: 'Tuscany per Uomo Eau de Parfum' },
+      { brand: '', name: 'Dior Homme (2020) (Eau de Toilette) by Dior' },
+      { brand: '', name: 'Dior Homme (2020)' },
+      { brand: '', name: 'Eau de Parfum' },
       { brand: '', name: 'Somebody by Night' },
       { brand: '', name: 'Other fragrance' },
     ])
   })
 
   it('deduplicates Parfumo cards with manual entries and preserves unrelated rows', () => {
-    expect(parseSimilarityList('Pure Vision by Caline\nPure Vision\nCaline | Pure Vision\nOther fragrance'))
-      .toMatchObject([{ brand: 'Caline', name: 'Pure Vision' }, { brand: '', name: 'Other fragrance' }])
+    expect(parseSimilarityList('Pure Vision by Caline\nPure Vision\nCaline | Pure Vision\nOther fragrance\nReviews'))
+      .toMatchObject([
+        { brand: 'Caline', name: 'Pure Vision' }, { brand: '', name: 'Other fragrance' }, { brand: '', name: 'Reviews' },
+      ])
     expect(parseSimilarityList('Somebody by Night\nOther fragrance')).toMatchObject([
       { brand: '', name: 'Somebody by Night' }, { brand: '', name: 'Other fragrance' },
     ])

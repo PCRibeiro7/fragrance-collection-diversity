@@ -11,6 +11,7 @@ export interface ParsedSimilarityLine {
 export function parseSimilarityList(text: string): ParsedSimilarityLine[] {
   const seen = new Set<string>()
   const parsed: ParsedSimilarityLine[] = []
+  let hasParfumoCards = false
 
   const lines = text.split(/\r\n?|\n/).map((line) => line.trim()).filter(Boolean)
   const normalizeCardText = (value: string) => value.replace(/\s+/g, ' ').toLocaleLowerCase()
@@ -50,6 +51,11 @@ export function parseSimilarityList(text: string): ParsedSimilarityLine[] {
   for (let index = 0; index < lines.length; index += 1) {
     if (fragranticaMetadata.has(index)) continue
     let raw = lines[index]
+    // A page selection can continue into reviews and unrelated recommendations.
+    // Require the section subtitle so a manual fragrance named Reviews survives.
+    if (hasParfumoCards && /^Reviews$/i.test(raw) &&
+      /^\d[\d.,]* in-depth fragrance descriptions$/i.test(lines[index + 1] ?? '')) break
+
     // Parfumo copies a title followed by its visible name. Match the pair
     // before consuming either line so unrelated name-only rows remain intact.
     const byIndex = raw.toLocaleLowerCase().lastIndexOf(' by ')
@@ -65,11 +71,15 @@ export function parseSimilarityList(text: string): ParsedSimilarityLine[] {
     if (aliases.length > 1 && sharedQualifier) {
       titleNames.push(...aliases.slice(0, -1).map((name) => `${name} ${sharedQualifier}`))
     }
-    const parfumoCard = !raw.includes('|') && byIndex > 0 && parfumoBrand && displayName &&
-      titleNames.some((name) => normalizeTitle(name) === normalizeTitle(displayName))
+    // Some clipboard selections put the concentration on its own line.
+    // Consume it only when the combined display text matches the full title.
+    const parfumoName = displayName && [displayName, `${displayName} ${lines[index + 2] ?? ''}`]
+      .find((candidate) => titleNames.some((name) => normalizeTitle(name) === normalizeTitle(candidate)))
+    const parfumoCard = !raw.includes('|') && byIndex > 0 && parfumoBrand && parfumoName
     if (parfumoCard) {
-      raw = `${parfumoBrand} | ${displayName}`
-      index += 1
+      raw = `${parfumoBrand} | ${parfumoName}`
+      index += parfumoName === displayName ? 1 : 2
+      hasParfumoCards = true
     } else if (cardIndexes.has(index)) {
       raw = `${lines[index + 1]} | ${lines[index + 2]}`
       index += 2
