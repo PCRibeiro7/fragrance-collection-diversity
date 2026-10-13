@@ -6,8 +6,11 @@ import { useDatabaseSnapshot } from '../data/useDatabaseSnapshot'
 import { useDuplicateReviewState } from '../data/useDuplicateReviewState'
 import { displayName, identityKey, validateHttpUrl } from '../domain/identity'
 import { parseSimilarityList, similarityScore, type ParsedSimilarityLine } from '../domain/parser'
+import { importedSimilarityRows, type FragrancePageImport } from '../domain/fragranceImport'
 import type { Fragrance, FragranceAlias, SimilaritySource } from '../domain/types'
 import { Modal } from './Modal'
+import { FragrancePageImporter, ImportedListAcknowledgment } from './FragrancePageImporter'
+import { FragranticaCaptureHelp } from './FragranticaCaptureHelp'
 
 interface AddFragranceDialogProps {
   onClose: () => void
@@ -57,6 +60,8 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
   const [reviewRows, setReviewRows] = useState<ReviewRows | null>(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [imports, setImports] = useState<Partial<Record<SimilaritySource, FragrancePageImport>>>({})
+  const [acknowledgedImports, setAcknowledgedImports] = useState<Partial<Record<SimilaritySource, boolean>>>({})
 
   const resolved = resolveKnownIdentity({ brand, name, variant }, snapshot.fragrances, reviewState.aliases)
   const fragranceById = useMemo(
@@ -65,6 +70,34 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
   )
   const allReviewRows = reviewRows ? SOURCES.flatMap((source) => reviewRows[source]) : []
   const reviewedSources = reviewRows ? SOURCES.filter((source) => lists[source].rows.length > 0) : []
+  const uncertainSources = reviewedSources.filter((source) => imports[source]?.completeness !== 'complete' && imports[source])
+  const missingAcknowledgment = uncertainSources.some((source) => !acknowledgedImports[source])
+
+  function changesIdentity(result: FragrancePageImport): boolean {
+    return Boolean(brand.trim() || name.trim() || variant.trim()) && identityKey({ brand, name, variant }) !== identityKey(result.fragrance)
+  }
+
+  function applyImport(result: FragrancePageImport) {
+    const changed = changesIdentity(result)
+    if (changed) {
+      setLists({ fragrantica: { text: '', rows: [] }, parfumo: { text: '', rows: [] } })
+      setImports({})
+      setFragranticaUrl('')
+      setParfumoUrl('')
+    }
+    setBrand(result.fragrance.brand)
+    setName(result.fragrance.name)
+    setVariant(result.fragrance.variant ?? '')
+    if (result.source === 'fragrantica') setFragranticaUrl(result.pageUrl)
+    else setParfumoUrl(result.pageUrl)
+    if (result.similarities.length) {
+      const rows = importedSimilarityRows(result)
+      setLists((current) => ({ ...current, [result.source]: { text: rows.map((row) => row.raw).join('\n'), rows } }))
+      setImports((current) => ({ ...current, [result.source]: result }))
+    }
+    setAcknowledgedImports({})
+    setError('')
+  }
 
   function validateDetails(): boolean {
     setError('')
@@ -74,6 +107,16 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
     }
     if (!validateHttpUrl(fragranticaUrl) || !validateHttpUrl(parfumoUrl)) {
       setError('Source links must be valid http or https URLs.')
+      return false
+    }
+    const mismatchedImport = SOURCES.find((source) => {
+      const imported = imports[source]
+      if (!imported || !lists[source].rows.length || identityKey(imported.fragrance) === identityKey({ brand, name, variant })) return false
+      const known = resolveKnownIdentity(imported.fragrance, snapshot.fragrances, reviewState.aliases)
+      return !known || known.id !== resolved?.id
+    })
+    if (mismatchedImport) {
+      setError(`The ${sourceLabel(mismatchedImport)} list belongs to ${displayName(imports[mismatchedImport]!.fragrance)}. Use its fragrance details or clear that list before changing the identity.`)
       return false
     }
     const unparsedSource = SOURCES.find((source) => lists[source].text.trim() && !lists[source].rows.length)
@@ -87,6 +130,7 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
   function beginReview(event: FormEvent) {
     event.preventDefault()
     if (!validateDetails()) return
+    setAcknowledgedImports({})
 
     if (!SOURCES.some((source) => lists[source].rows.length > 0)) {
       void save({ fragrantica: [], parfumo: [] })
@@ -103,6 +147,8 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
   }
 
   function updateRow(source: SimilaritySource, id: string, patch: Partial<ReviewRow>) {
+    setAcknowledgedImports({})
+    setImports((current) => current[source] ? { ...current, [source]: { ...current[source], completeness: 'unknown' } } : current)
     setReviewRows((current) => {
       if (!current) return null
       return {
@@ -123,6 +169,8 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
 
   function removeRow(source: SimilaritySource, id: string) {
     if (saving) return
+    setAcknowledgedImports({})
+    setImports((current) => current[source] ? { ...current, [source]: { ...current[source], completeness: 'unknown' } } : current)
     setReviewRows((current) => current ? {
       ...current,
       [source]: current[source].filter((row) => row.id !== id),
@@ -132,6 +180,10 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
 
   async function save(rows: ReviewRows) {
     if (saving) return
+    if (missingAcknowledgment) {
+      setError('Acknowledge each partial or unverified imported list before saving.')
+      return
+    }
     const rowsToSave = SOURCES.flatMap((source) => rows[source])
     if (rowsToSave.some((row) => !row.brand.trim() || !row.name.trim())) {
       setError('Complete the brand and fragrance name on every row.')
@@ -200,7 +252,7 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
       }}>
         <ArrowLeft size={16} /> Back
       </button>
-      <button className="button button--primary" type="button" disabled={saving || allReviewRows.length === 0} onClick={() => save(reviewRows)}>
+      <button className="button button--primary" type="button" disabled={saving || allReviewRows.length === 0 || missingAcknowledgment} onClick={() => save(reviewRows)}>
         <Check size={16} /> {saving ? 'Saving…' : 'Save fragrance and relationships'}
       </button>
     </>
@@ -218,11 +270,14 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
       title={reviewRows ? 'Review identity matches' : 'Add to your collection'}
       eyebrow={reviewRows ? displayName({ brand, name, variant }) : 'Owned fragrance'}
       onClose={onClose}
+      dismissDisabled={saving}
       wide
       footer={footer}
     >
       {!reviewRows ? (
         <form id="add-fragrance" className="form-stack add-fragrance-form" onSubmit={beginReview}>
+          <FragrancePageImporter onApply={applyImport} applicationNotice={(result) => changesIdentity(result)
+            ? 'Using this page will replace the current fragrance details and clear draft lists for the previous identity.' : undefined} />
           {resolved && <p role="status">Will reuse {displayName(resolved)}. Its existing name and source links are retained when matching a previously merged name.</p>}
           <div className="field-row">
             <label className="field">
@@ -253,6 +308,7 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
                     placeholder={source === 'fragrantica' ? 'https://www.fragrantica.com/perfume/…' : 'https://www.parfumo.com/Perfumes/…'}
                   />
                 </label>
+                {source === 'fragrantica' && <FragranticaCaptureHelp pageUrl={fragranticaUrl} />}
                 <label className="field">
                   <span>{sourceLabel(source)} relationships <em>optional</em></span>
                   <textarea
@@ -261,7 +317,14 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
                     placeholder={source === 'parfumo' ? 'Pure Vision by C\u00e2line\nPure Vision\nFantasme by Maison Alhambra\nFantasme' : 'Brand | Fragrance\nBrand | Another fragrance'}
                     onChange={(event) => {
                       const text = event.target.value
-                      setLists((current) => ({ ...current, [source]: { text, rows: parseSimilarityList(text) } }))
+                      setLists((current) => ({ ...current, [source]: { text, rows: parseSimilarityList(text).map((row) => current[source].rows.find((previous) => previous.raw === row.raw) ?? row) } }))
+                      setImports((current) => {
+                        const next = { ...current }
+                        if (!text.trim()) delete next[source]
+                        else if (next[source]) next[source] = { ...next[source], completeness: 'unknown' }
+                        return next
+                      })
+                      setAcknowledgedImports({})
                     }}
                   />
                   <small>{source === 'parfumo' && 'Copy directly from Parfumo, including the "Fragrance by Brand" lines and repeated names. '}Paste a similarity list or enter one Brand | Fragrance per line. Review and edit the matches next.</small>
@@ -289,6 +352,7 @@ export function AddFragranceDialog({ onClose, onSaved }: AddFragranceDialogProps
           {reviewedSources.map((source) => (
             <section className="add-review-source" key={source}>
               <h3>{sourceLabel(source)} <span>{reviewRows[source].length} {reviewRows[source].length === 1 ? 'relationship' : 'relationships'}</span></h3>
+              {uncertainSources.includes(source) && <ImportedListAcknowledgment result={imports[source]!} acknowledged={Boolean(acknowledgedImports[source])} onChange={(value) => setAcknowledgedImports((current) => ({ ...current, [source]: value }))} />}
               <div className="review-table" role="table" aria-label={`${sourceLabel(source)} fragrance identities`}>
                 <div className="review-table__header" role="row">
                   <span>Brand</span><span>Fragrance</span><span>Variant</span><span>Identity decision</span><span aria-label="Actions" />

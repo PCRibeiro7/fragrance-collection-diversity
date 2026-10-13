@@ -5,10 +5,10 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  { ignores: ['dist', '.netlify'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['**/*.{ts,tsx}'],
+    files: ['**/*.{ts,tsx,mts}'],
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.browser,
@@ -21,5 +21,19 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
+  },
+  {
+    files: ['server/**/*.ts', 'netlify/**/*.mts'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    extends: [js.configs.recommended],
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    extends: [js.configs.recommended],
+    files: ['browser-helper/**/*.js'],
+    languageOptions: { globals: { ...globals.browser, chrome: 'readonly' } },
   },
 )

@@ -1,0 +1,9 @@
+:root { color-scheme: light; font: 14px/1.5 system-ui, sans-serif; color: #302b25; background: #faf7f1; }
+body { width: 320px; padding: 18px; margin: 0; }
+h1 { margin: 0 0 12px; font: 24px Georgia, serif; }
+p { margin: 12px 0; }
+button { width: 100%; padding: 11px; border: 0; border-radius: 8px; font: inherit; font-weight: 700; color: white; background: #34645a; cursor: pointer; }
+button:disabled { opacity: .6; cursor: wait; }
+button:focus-visible { outline: 2px solid #302b25; outline-offset: 3px; }
+small { color: #786f65; }
+#status { overflow-wrap: anywhere; }

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Capture fragrance similarities</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <h1>Capture similarities</h1>
+    <p>On Fragrantica, scroll to <strong>This perfume reminds me of</strong> and wait for the cards to load. Use the page's controls to load more cards if available.</p>
+    <p>On Parfumo, scroll to <strong>Smells similar</strong>, select <strong>Similar</strong>, and load <strong>All</strong> cards if available before capturing.</p>
+    <button id="capture" type="button">Capture loaded section</button>
+    <p id="status" role="status" aria-live="polite"></p>
+    <button id="download" type="button" hidden>Download capture</button>
+    <p>Return to Scent Map and choose <strong>Load browser capture</strong>. Review the extracted identities before saving.</p>
+    <small>Reads only the current page's fragrance identity and loaded similarity section. Makes no requests and saves no collection data.</small>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

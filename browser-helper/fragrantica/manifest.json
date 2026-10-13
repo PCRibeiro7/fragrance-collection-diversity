@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Scent Map Fragrance Capture",
+  "version": "0.2.0",
+  "description": "Capture loaded fragrance similarity cards on English Fragrantica and Parfumo pages.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_title": "Capture fragrance similarities",
+    "default_popup": "popup.html"
+  }
+}

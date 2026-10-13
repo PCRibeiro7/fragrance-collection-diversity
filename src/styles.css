@@ -272,6 +272,29 @@ button { color: inherit; }
 .add-relationship-editor { position: relative; min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #f6f2eb; }
 .add-relationship-editor h3 { margin: 0; font: 500 18px/1.2 Georgia, serif; }
 .add-relationship-editor .field textarea { min-height: 190px; background: #fff; }
+.page-import { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #f6f2eb; gap: 12px; }
+.page-import__intro h3 { margin: 0; font: 500 18px/1.3 Georgia, serif; }
+.page-import__intro h3 span { margin-left: 8px; color: var(--muted); font: 700 9px/1.3 sans-serif; }
+.page-import__intro p, .page-import__result p { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.page-import__controls { display: flex; align-items: flex-end; gap: 10px; }
+.page-import__controls .field { flex: 1; min-width: 0; }
+.page-import__controls button { flex-shrink: 0; min-height: 41px; }
+.page-import__result { padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: #fffefa; overflow-wrap: anywhere; }
+.page-import__result > strong { display: block; font-size: 13px; }
+.page-import__result > a { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; color: var(--green); font-size: 11px; }
+.page-import__result details { margin-top: 10px; font-size: 11px; }
+.page-import__result summary { cursor: pointer; }
+.page-import__result > button { margin-top: 12px; }
+.page-import__warnings { padding-left: 18px; color: #86500b; font-size: 11px; line-height: 1.5; }
+.page-import__similarities { max-height: 160px; padding-left: 18px; overflow-y: auto; line-height: 1.7; }
+.import-acknowledgment { padding: 12px; margin-bottom: 12px; border: 1px solid #d5bc8f; border-radius: 9px; background: #faf1df; color: #725024; font-size: 11px; line-height: 1.5; }
+.import-acknowledgment p { margin: 0 0 8px; }
+.import-acknowledgment label { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.import-acknowledgment input { flex-shrink: 0; margin-top: 3px; accent-color: var(--green); }
+.fragrantica-capture-help { padding: 12px; border-left: 3px solid #a99783; border-radius: 7px; background: #eee8df; font-size: 11px; line-height: 1.5; }
+.fragrantica-capture-help strong { color: var(--ink); }
+.fragrantica-capture-help p { margin: 7px 0 0; color: #776e63; }
+.fragrantica-capture-help a { display: inline-flex; align-items: center; gap: 5px; margin-top: 9px; color: var(--green); }
 .add-parsed-count { position: absolute; top: 19px; right: 18px; margin: 0; color: var(--green); font-size: 9px; font-weight: 800; }
 .add-review-source { min-width: 730px; }
 .add-review-source > h3 { display: flex; align-items: baseline; gap: 8px; margin: 4px 0 8px; font: 500 17px/1.2 Georgia, serif; }
@@ -407,6 +430,7 @@ button { color: inherit; }
   .modal__header, .modal__body, .modal__footer { padding-left: 16px; padding-right: 16px; }
   .field-row, .source-fields { display: flex; flex-direction: column; }
   .add-relationship-grid { grid-template-columns: 1fr; }
+  .page-import__controls { flex-direction: column; align-items: stretch; }
   .add-relationship-editor { padding: 14px; }
   .add-parsed-count { top: 15px; right: 14px; }
   .preview-list-grid, .preview-match-list { grid-template-columns: 1fr; }

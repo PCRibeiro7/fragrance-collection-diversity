@@ -5,6 +5,8 @@ import { useMemo, useState } from 'react'
 import { replaceCapture } from '../data/repository'
 import { displayName, identityKey, validateHttpUrl } from '../domain/identity'
 import { parseSimilarityList, similarityScore } from '../domain/parser'
+import { importedSimilarityRows, type FragrancePageImport } from '../domain/fragranceImport'
+import type { ParsedSimilarityLine } from '../domain/parser'
 import type {
   Fragrance,
   FragranceAlias,
@@ -13,6 +15,8 @@ import type {
   SourceCapture,
 } from '../domain/types'
 import { Modal } from './Modal'
+import { FragrancePageImporter, ImportedListAcknowledgment } from './FragrancePageImporter'
+import { FragranticaCaptureHelp } from './FragranticaCaptureHelp'
 
 interface CaptureDialogProps {
   root: Fragrance
@@ -66,6 +70,10 @@ export function CaptureDialog({
   const [rows, setRows] = useState<ReviewRow[] | null>(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [imported, setImported] = useState<FragrancePageImport | null>(null)
+  const [draftRows, setDraftRows] = useState<ParsedSimilarityLine[] | null>(null)
+  const [acknowledgedImport, setAcknowledgedImport] = useState(false)
+  const needsAcknowledgment = Boolean(imported && imported.completeness !== 'complete')
 
   const currentCapture = captures.find(
     (capture) => capture.rootFragranceId === root.id && capture.source === source,
@@ -87,9 +95,39 @@ export function CaptureDialog({
   )
 
   function changeSource(next: SimilaritySource) {
+    if (next === source) return
     setSource(next)
     setPageUrl(root.sourceUrls[next] ?? '')
     setRows(null)
+    setText('')
+    setImported(null)
+    setDraftRows(null)
+    setAcknowledgedImport(false)
+    setError('')
+  }
+
+  function importMismatch(result: FragrancePageImport): string | undefined {
+    const known = resolveKnownIdentity(result.fragrance, fragrances, reviewState.aliases)
+    return identityKey(result.fragrance) === identityKey(root) || known?.id === root.id ? undefined
+      : `This page identifies ${displayName(result.fragrance)}, but you are capturing relationships for ${displayName(root)}. Use the matching fragrance and concentration page.`
+  }
+
+  function makeReviewRows(parsed: ParsedSimilarityLine[]): ReviewRow[] {
+    return parsed.map((line) => {
+      const matches = findSuggestions(line.brand, line.name, line.variant, fragrances, reviewState.aliases)
+      return { ...line, existingId: matches.exact?.id ?? '', suggestions: matches.suggestions }
+    })
+  }
+
+  function applyImport(result: FragrancePageImport) {
+    if (!result.similarities.length || importMismatch(result)) return
+    const parsed = importedSimilarityRows(result)
+    setPageUrl(result.pageUrl)
+    setText(parsed.map((row) => row.raw).join('\n'))
+    setDraftRows(parsed)
+    setImported(result)
+    setAcknowledgedImport(false)
+    setRows(makeReviewRows(parsed))
     setError('')
   }
 
@@ -99,24 +137,18 @@ export function CaptureDialog({
       setError('The source page must be a valid http or https URL.')
       return
     }
-    const parsed = parseSimilarityList(text)
+    const parsed = draftRows ?? parseSimilarityList(text)
     if (!parsed.length) {
       setError('Paste at least one related fragrance before continuing.')
       return
     }
-    setRows(
-      parsed.map((line) => {
-        const matches = findSuggestions(line.brand, line.name, line.variant, fragrances, reviewState.aliases)
-        return {
-          ...line,
-          existingId: matches.exact?.id ?? '',
-          suggestions: matches.suggestions,
-        }
-      }),
-    )
+    setAcknowledgedImport(false)
+    setRows(makeReviewRows(parsed))
   }
 
   function updateRow(id: string, patch: Partial<ReviewRow>) {
+    setAcknowledgedImport(false)
+    setImported((current) => current ? { ...current, completeness: 'unknown' } : current)
     setRows((current) =>
       current?.map((row) => {
         if (row.id !== id) return row
@@ -133,6 +165,8 @@ export function CaptureDialog({
 
   function removeRow(id: string) {
     if (saving) return
+    setAcknowledgedImport(false)
+    setImported((current) => current ? { ...current, completeness: 'unknown' } : current)
     setRows((current) => current?.filter((row) => row.id !== id) ?? null)
     setError('')
   }
@@ -165,6 +199,10 @@ export function CaptureDialog({
 
   async function save() {
     if (!rows?.length || saving) return
+    if (needsAcknowledgment && !acknowledgedImport) {
+      setError('Acknowledge the partial or unverified imported list before replacing saved relationships.')
+      return
+    }
     if (rows.some((row) => !row.brand.trim() || !row.name.trim())) {
       setError('Complete the brand and fragrance name on every row.')
       return
@@ -193,10 +231,10 @@ export function CaptureDialog({
 
   const footer = rows ? (
     <>
-      <button className="button button--quiet" type="button" onClick={() => setRows(null)}>
+      <button className="button button--quiet" type="button" disabled={saving} onClick={() => setRows(null)}>
         <ArrowLeft size={16} /> Back
       </button>
-      <button className="button button--primary" type="button" disabled={saving || rows.length === 0} onClick={save}>
+      <button className="button button--primary" type="button" disabled={saving || rows.length === 0 || (needsAcknowledgment && !acknowledgedImport)} onClick={save}>
         <Check size={16} /> {saving ? 'Saving…' : 'Replace source list'}
       </button>
     </>
@@ -216,6 +254,7 @@ export function CaptureDialog({
       title={rows ? 'Review identity matches' : 'Capture similarity list'}
       eyebrow={displayName(root)}
       onClose={onClose}
+      dismissDisabled={saving}
       footer={footer}
       wide={Boolean(rows)}
     >
@@ -237,6 +276,7 @@ export function CaptureDialog({
               Parfumo
             </button>
           </div>
+          <FragrancePageImporter key={source} source={source} mode="relationships" initialUrl={pageUrl} onApply={applyImport} applicationError={importMismatch} />
           <div className="capture-status-note">
             <Sparkles size={17} />
             <span>
@@ -249,13 +289,21 @@ export function CaptureDialog({
             <span>Source page <em>optional</em></span>
             <input type="url" value={pageUrl} onChange={(event) => setPageUrl(event.target.value)} />
           </label>
+          {source === 'fragrantica' && <FragranticaCaptureHelp pageUrl={pageUrl} />}
           <label className="field">
             <span>Related fragrances</span>
             <textarea
               autoFocus
               rows={11}
               value={text}
-              onChange={(event) => setText(event.target.value)}
+              onChange={(event) => {
+                const next = event.target.value
+                setText(next)
+                setDraftRows(parseSimilarityList(next).map((row) => draftRows?.find((previous) => previous.raw === row.raw) ?? row))
+                if (!next.trim()) setImported(null)
+                else if (imported) setImported({ ...imported, completeness: 'unknown' })
+                setAcknowledgedImport(false)
+              }}
               placeholder={source === 'parfumo' ? 'Pure Vision by C\u00e2line\nPure Vision\nFantasme by Maison Alhambra\nFantasme' : 'Diptyque | Philosykos\nPremier Figuier\nHermès | Un Jardin en Méditerranée'}
             />
             <small>
@@ -266,11 +314,12 @@ export function CaptureDialog({
             </small>
           </label>
           <div className="privacy-note">
-            This app does not visit or scrape either source. Only the text you enter is stored locally.
+            Link import requests only the submitted source page. Your collection stays in this browser, and relationships are saved only after review.
           </div>
         </div>
       ) : (
         <div className="review-layout">
+          {needsAcknowledgment && imported && <ImportedListAcknowledgment result={imported} acknowledged={acknowledgedImport} onChange={setAcknowledgedImport} />}
           <div className="review-summary">
             <div><strong>{rows.length}</strong><span>in new list</span></div>
             <div className="positive"><strong>+{addedRows.length}</strong><span>added</span></div>
