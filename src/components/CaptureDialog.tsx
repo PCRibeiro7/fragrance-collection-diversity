@@ -261,7 +261,7 @@ export function CaptureDialog({
             <small>
               {source === 'parfumo'
                 ? 'Paste directly from Parfumo, including the "Fragrance by Brand" lines and repeated fragrance names. '
-                : 'Paste Fragrantica\'s "This perfume reminds me of" section directly, including vote counts and Compare labels. '}
+                : 'Paste Fragrantica\'s "This perfume reminds me of" section directly, including translated labels and vote counts. '}
               You can also enter one <code>Brand | Fragrance</code> per line. Review and edit the matches next.
             </small>
           </label>

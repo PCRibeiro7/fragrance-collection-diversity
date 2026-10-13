@@ -13,18 +13,42 @@ export function parseSimilarityList(text: string): ParsedSimilarityLine[] {
   const parsed: ParsedSimilarityLine[] = []
 
   const lines = text.split(/\r\n?|\n/).map((line) => line.trim()).filter(Boolean)
+  const normalizeCardText = (value: string) => value.replace(/\s+/g, ' ').toLocaleLowerCase()
   const isCard = (index: number) => {
     const [heading, brand, name] = lines.slice(index, index + 3)
     return Boolean(
       heading && brand && name &&
-      /^perfume\s+/i.test(heading) &&
-      heading.replace(/^perfume\s+/i, '').toLocaleLowerCase() ===
-        `${name} ${brand}`.toLocaleLowerCase(),
+      !heading.includes('|') &&
+      normalizeCardText(heading).endsWith(` ${normalizeCardText(`${name} ${brand}`)}`),
     )
   }
-  const fragranticaPaste = lines.some((_, index) => isCard(index))
+  const cardIndexes = new Set(lines.flatMap((_, index) => isCard(index) ? [index] : []))
+  const fragranticaMetadata = new Set<number>()
+  const firstCardIndex = cardIndexes.values().next().value
+  if (firstCardIndex !== undefined) {
+    // The section heading and Suggest control precede the first card.
+    // Their position stays the same when the interface language changes.
+    const headerStart = Math.max(0, firstCardIndex - 2)
+    if (lines.slice(headerStart, firstCardIndex).every((line) => !line.includes('|') && !/ by /i.test(line))) {
+      for (let index = headerStart; index < firstCardIndex; index += 1) fragranticaMetadata.add(index)
+    }
+    for (const cardIndex of cardIndexes) {
+      let index = cardIndex + 3
+      while (!cardIndexes.has(index) && /^\d[\d.,\s]*k?$/i.test(lines[index] ?? '')) {
+        fragranticaMetadata.add(index)
+        index += 1
+      }
+      // Compare follows the votes, or ends a card that has no votes.
+      // Keep explicit manual rows and Parfumo cards outside these slots.
+      if (lines[index] && !lines[index].includes('|') && !/ by /i.test(lines[index]) && !cardIndexes.has(index) &&
+        (index > cardIndex + 3 || index + 1 === lines.length || cardIndexes.has(index + 1) || lines[index + 1]?.includes('|'))) {
+        fragranticaMetadata.add(index)
+      }
+    }
+  }
 
   for (let index = 0; index < lines.length; index += 1) {
+    if (fragranticaMetadata.has(index)) continue
     let raw = lines[index]
     // Parfumo copies a title followed by its visible name. Match the pair
     // before consuming either line so unrelated name-only rows remain intact.
@@ -46,11 +70,9 @@ export function parseSimilarityList(text: string): ParsedSimilarityLine[] {
     if (parfumoCard) {
       raw = `${parfumoBrand} | ${displayName}`
       index += 1
-    } else if (fragranticaPaste && isCard(index)) {
+    } else if (cardIndexes.has(index)) {
       raw = `${lines[index + 1]} | ${lines[index + 2]}`
       index += 2
-    } else if (fragranticaPaste && /^(?:This perfume reminds me of|Suggest|Compare|\d[\d.,\s]*k?)$/i.test(raw)) {
-      continue
     }
 
     const dividerIndex = raw.indexOf('|')

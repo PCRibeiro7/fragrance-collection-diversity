@@ -13,36 +13,50 @@ describe('similarity list parser', () => {
     expect(parseSimilarityList('Dior | Sauvage\n dior|  sauvage ')).toHaveLength(1)
   })
 
-  it('extracts all 20 fragrances from a Fragrantica section with blank lines and votes', () => {
+  it('extracts all 20 fragrances from a Portuguese Fragrantica section with blank lines and votes', () => {
     const entries = [
-      ['Montblanc', 'Explorer', 693, 472],
-      ['Creed', 'Aventus', 699, 495],
-      ['Creed', 'Aventus Cologne', 613, 327],
-      ['Armaf', 'Club de Nuit Intense Man', 469, 344],
-      ['Maison Alhambra', 'Jubilant Vitality', 100, 16],
-      ['Dora The Explorer', 'Dora and Boots', 396, 648],
-      ['Armaf', 'Club de Nuit Intense Man Parfum', 128, 167],
-      ['In The Box', 'Citrus Craving', 49, 11],
-      ['Zara', 'Vibrant Leather Eau de Parfum', 71, 61],
-      ['Al Haramain Perfumes', "L'Aventure", 85, 102],
-      ['Manoard', 'Energy', 22, 11],
-      ['Mancera', 'Cedrat Boise', 140, 253],
-      ['Nishane', 'Hacivat', 76, 127],
-      ['Afnan', 'Supremacy Not Only Intense', 81, 140],
-      ['Rayhaan', 'Adonis Icarus', 38, 55],
-      ['Natura', 'Essencial Sentir', 34, 48],
-      ['Goldfield & Banks Australia', 'Bohemian Lime', 80, 141],
-      ['Pendora Scents', 'Vivant Sunlit', 10, 4],
-      ['Dior', 'Dior Homme Cologne 2022', 33, 52],
-      ['Armaf', 'Odyssey Limoni Fresh', 43, 74],
+      ['Dior', 'Dior Homme 2020', '1.1k', '254'],
+      ['Issey Miyake', 'L\u2019Eau d\u2019Issey pour Homme Vetiver', '255', '131'],
+      ['Maison Alhambra', 'Dark Door Sport', '208', '49'],
+      ['Frederic Malle Editions de Parfums', 'Uncut Gem', '88', '124'],
+      ['Assaf', 'Arrogate Blue De', '24', '8'],
+      ['Issey Miyake', "L'Eau d'Issey Pour Homme", '164', '301'],
+      ['Loewe', 'Loewe 7 Cobalt', '36', '46'],
+      ['Givenchy', 'Gentleman Society Sport', '41', '63'],
+      ['Moncler', 'Moncler Sunrise pour Homme', '23', '27'],
+      ['Issey Miyake', "L'Eau d'Issey Pour Homme Fraiche", '18', '19'],
+      ['Fragrance World', "D'hommes Sport", '12', '7'],
+      ['Herm\u00e8s', "Terre d'Herm\u00e8s", '44', '74'],
+      ['Dior', 'Dior Homme Sport 2017', '49', '87'],
+      ['Arabiyat Prestige', 'Hamdan The Hero', '6', '1'],
+      ['Antonio Puig', 'Quorum Silver', '13', '16'],
+      ['Herm\u00e8s', "Terre D'Hermes Eau Intense Vetiver", '18', '26'],
+      ['Versace', 'Eros Energy', '29', '50'],
+      ['Emirates Pride Perfumes', 'Midnight Glow', '4', '0'],
+      ['Creed', 'Aventus', '21', '35'],
+      ['Tom Ford', 'Costa Azzurra Parfum', '9', '11'],
     ] as const
-    const text = ['This perfume reminds me of', 'Suggest', ...entries.flatMap(
-      ([brand, name, up, down]) => [`perfume ${name} ${brand}`, brand, name, up, down, 'Compare'],
+    const text = ['Este Perfume me Lembra do', 'Sugerir', ...entries.flatMap(
+      ([brand, name, up, down]) => [`perfume ${name} ${brand}`, brand, name, up, down, 'Comparar'],
     )].join('\r\n\r\n')
 
     expect(parseSimilarityList(text).map(({ brand, name }) => ({ brand, name }))).toEqual(
       entries.map(([brand, name]) => ({ brand, name })),
     )
+  })
+
+  it('recognizes translated card titles and non-Latin interface labels', () => {
+    const text = [
+      '\u042d\u0442\u043e\u0442 \u0430\u0440\u043e\u043c\u0430\u0442 \u043d\u0430\u043f\u043e\u043c\u0438\u043d\u0430\u0435\u0442 \u043c\u043d\u0435',
+      '\u041f\u0440\u0435\u0434\u043b\u043e\u0436\u0438\u0442\u044c',
+      '\u0434\u0443\u0445\u0438 Terre d\u2019Herm\u00e8s Herm\u00e8s',
+      'Herm\u00e8s', 'Terre d\u2019Herm\u00e8s', '1,1k', '254',
+      '\u0421\u0440\u0430\u0432\u043d\u0438\u0442\u044c',
+    ].join('\n\n')
+
+    expect(parseSimilarityList(text).map(({ brand, name }) => ({ brand, name }))).toEqual([
+      { brand: 'Herm\u00e8s', name: 'Terre d\u2019Herm\u00e8s' },
+    ])
   })
 
   it('ignores abbreviated vote counts in the Aventus related fragrance list', () => {
@@ -85,16 +99,18 @@ describe('similarity list parser', () => {
 
   it('supports cards without votes and deduplicates cards and manual rows together', () => {
     expect(parseSimilarityList(
-      'perfume Explorer Montblanc\nMontblanc\nExplorer\nCompare\nMontblanc | Explorer\nCreed | Aventus',
+      '212\nMontblanc | Explorer\nperfume Explorer Montblanc\nMontblanc\nExplorer\nComparar\nMontblanc | Explorer\nCreed | Aventus\nOther fragrance',
     )).toMatchObject([
+      { brand: '', name: '212' },
       { brand: 'Montblanc', name: 'Explorer' },
       { brand: 'Creed', name: 'Aventus' },
+      { brand: '', name: 'Other fragrance' },
     ])
   })
 
   it('preserves numeric and interface-like names in manual lists', () => {
-    expect(parseSimilarityList('212\nCompare\nSuggest')).toMatchObject([
-      { name: '212' }, { name: 'Compare' }, { name: 'Suggest' },
+    expect(parseSimilarityList('212\nCompare\nSuggest\nComparar\nSugerir')).toMatchObject([
+      { name: '212' }, { name: 'Compare' }, { name: 'Suggest' }, { name: 'Comparar' }, { name: 'Sugerir' },
     ])
   })
 

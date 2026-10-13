@@ -23,7 +23,7 @@ npm test
 1. Use **Preview a fragrance** to compare a candidate with the collection without saving it. Paste either community similarity list to see direct owned overlaps, shared context, the closest known profiles, and its predicted group.
 2. Add an owned fragrance with its brand, name, and optional concentration/source links.
 3. Select the fragrance and choose **Capture relationships**.
-4. Pick Fragrantica or Parfumo and paste one related fragrance per line. `Brand | Fragrance` is the preferred format.
+4. Pick Fragrantica or Parfumo and paste one related fragrance per line. `Brand | Fragrance` is the preferred format. You can also paste Fragrantica's similarity section directly, including translated headings and buttons, fragrance cards, and vote counts.
 5. Complete missing brands and review identity suggestions. Fuzzy suggestions are never merged automatically.
 6. Replace the saved list and inspect the resulting graph, evidence, shared context, and collection coverage.
 
