@@ -73,7 +73,12 @@ export function parseSimilarityList(text: string): ParsedSimilarityLine[] {
     }
     // Some clipboard selections put the concentration on its own line.
     // Consume it only when the combined display text matches the full title.
-    const parfumoName = displayName && [displayName, `${displayName} ${lines[index + 2] ?? ''}`]
+    const displayNames = [displayName, `${displayName} ${lines[index + 2] ?? ''}`]
+    // Prefer the qualified name even when a shorter alias already matches.
+    if (sharedQualifier && normalizeTitle(sharedQualifier) === normalizeTitle(lines[index + 2] ?? '')) {
+      displayNames.reverse()
+    }
+    const parfumoName = displayName && displayNames
       .find((candidate) => titleNames.some((name) => normalizeTitle(name) === normalizeTitle(candidate)))
     const parfumoCard = !raw.includes('|') && byIndex > 0 && parfumoBrand && parfumoName
     if (parfumoCard) {

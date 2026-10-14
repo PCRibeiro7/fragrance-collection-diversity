@@ -198,11 +198,15 @@ describe('similarity list parser', () => {
       'Stand In',
       'Tuscany per Uomo / Etruscan (Eau de Toilette) by Aramis',
       'Etruscan Eau de Toilette',
+      'L.12.12 Blanc / Eau de Lacoste L.12.12 Blanc (Eau de Toilette) by Lacoste',
+      'L.12.12 Blanc',
+      'Eau de Toilette',
     ].join('\n')
     expect(parseSimilarityList(text).map(({ brand, name }) => ({ brand, name }))).toEqual([
       { brand: 'Aramis', name: 'Tuscany per Uomo\u00a0Eau de Toilette' },
       { brand: 'Omerta', name: 'Stand In' },
       { brand: 'Aramis', name: 'Etruscan Eau de Toilette' },
+      { brand: 'Lacoste', name: 'L.12.12 Blanc Eau de Toilette' },
     ])
   })
 
